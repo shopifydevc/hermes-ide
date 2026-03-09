@@ -5,6 +5,7 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-DEA584?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/badge/license-BSL%201.1-blue)](LICENSE)
+[![Discord](https://img.shields.io/badge/Discord-Join_Server-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/vMQXSTY6BM)
 
 > An AI-native terminal that understands your projects, predicts your commands, and executes autonomously.
 
@@ -192,5 +193,6 @@ Found a vulnerability? Please report it responsibly via [ga.contact.me@gmail.com
 <p align="center">
   <a href="https://hermes-ide.com">Website</a> &middot;
   <a href="https://github.com/hermes-hq/hermes-ide/discussions">Discussions</a> &middot;
+      <a href="https://discord.gg/vMQXSTY6BM">Discord</a>a> &middot;
   <a href="https://hermes-ide.com/changelog">Changelog</a>
 </p>
