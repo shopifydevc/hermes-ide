@@ -9,12 +9,19 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
   typecheck:
     name: TypeScript
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - uses: actions/setup-node@v6
         with:
           node-version: 20
@@ -27,6 +34,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - uses: actions/setup-node@v6
         with:
           node-version: 20
@@ -39,6 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -50,6 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
@@ -60,23 +73,29 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          shared-key: ci
+          shared-key: ci-clippy
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Run clippy
         run: cd src-tauri && cargo clippy -- -D warnings
 
   rust-audit:
     name: Rust Security Audit
     runs-on: ubuntu-latest
+    # Only run on main branch pushes — slow and not useful for PR feedback loops
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     # Allow failures initially — there may be existing advisories we haven't addressed yet.
     # Remove continue-on-error once all known advisories are resolved or explicitly ignored.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          shared-key: ci
+          shared-key: ci-audit
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-audit
         run: cargo install cargo-audit
       - name: Run security audit
