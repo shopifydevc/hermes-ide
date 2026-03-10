@@ -439,6 +439,13 @@ jobs:
           echo "=== Release files ==="
           ls -la "$RELEASE_DIR/"
 
+      - name: Generate SHA256 checksums
+        run: |
+          cd release-files
+          sha256sum * > SHA256SUMS.txt
+          echo "=== SHA256SUMS ==="
+          cat SHA256SUMS.txt
+
       - name: Ensure GitHub Release exists
         env:
           GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
