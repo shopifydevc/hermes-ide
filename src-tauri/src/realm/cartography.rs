@@ -1167,10 +1167,7 @@ fn extract_import_module(line: &str) -> Option<String> {
     }
     // Python: import module / from module import ...
     if line.starts_with("import ") && !line.contains("from") {
-        let rest = line[7..]
-            .trim()
-            .split([',', ' ', '.'])
-            .next()?;
+        let rest = line[7..].trim().split([',', ' ', '.']).next()?;
         if !rest.is_empty() {
             return Some(rest.to_string());
         }
