@@ -223,6 +223,11 @@ const THEME_COLORS: Record<string, string> = {
   duel: "#ee4444",
   rainbow: "#d6a0ff",
   "80s": "#ffb000",
+  light: "#2563eb",
+  rose: "#c75580",
+  lavender: "#7c4dff",
+  mint: "#0d9668",
+  sand: "#c06a30",
   solarized: "#268bd2",
 };
 
