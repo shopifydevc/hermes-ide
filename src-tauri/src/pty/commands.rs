@@ -737,7 +737,7 @@ pub fn create_session(
     // Save the slave TTY path before spawning — needed later for direct
     // SIGINT delivery via tcgetpgrp()/kill() when the line discipline
     // fails to convert \x03 into a signal.
-    #[cfg(unix)]
+    #[cfg(target_os = "macos")]
     let saved_tty_path = pair.master.tty_name();
 
     #[cfg(target_os = "macos")]
@@ -1161,7 +1161,7 @@ pub fn create_session(
         session: session_arc,
         analyzer,
         child,
-        #[cfg(unix)]
+        #[cfg(target_os = "macos")]
         tty_path: saved_tty_path,
     };
     mgr.sessions.insert(session_id.clone(), pty_session);

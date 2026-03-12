@@ -32,7 +32,7 @@ pub(crate) struct PtySession {
     /// Path to the PTY slave device (e.g., /dev/ttys042).
     /// Used on macOS to send SIGINT directly to the foreground process group
     /// when the PTY line discipline fails to convert \x03 into a signal.
-    #[cfg(unix)]
+    #[cfg(target_os = "macos")]
     pub(crate) tty_path: Option<std::path::PathBuf>,
 }
 

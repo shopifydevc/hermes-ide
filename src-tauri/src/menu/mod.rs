@@ -132,6 +132,7 @@ pub fn build_app_menu(app: &AppHandle) -> Result<Menu<Wry>, Box<dyn std::error::
         .accelerator("Ctrl+C")
         .build(app)?;
 
+    #[allow(unused_mut)]
     let mut edit_builder = SubmenuBuilder::new(app, "Edit")
         .item(&undo)
         .item(&redo)
