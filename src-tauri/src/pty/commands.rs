@@ -1528,7 +1528,7 @@ pub fn is_shell_foreground(state: State<'_, AppState>, session_id: String) -> Re
     #[cfg(unix)]
     {
         let children = enumerate_child_pids(shell_pid);
-        return Ok(children.is_empty());
+        Ok(children.is_empty())
     }
 
     #[cfg(not(unix))]
