@@ -657,7 +657,7 @@ pub fn create_session(
         pixel_height: 0,
     };
     let pair = pty_system
-        .openpty(pty_size.clone())
+        .openpty(pty_size)
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
     // Workaround: portable-pty's openpty() does not apply the initial window
