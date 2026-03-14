@@ -1,5 +1,6 @@
 import type { Disposable, PluginSettingsSchema, HermesEvent } from "./types";
 import { invoke } from "@tauri-apps/api/core";
+import { open as shellOpen } from "@tauri-apps/plugin-shell";
 
 // Props passed to plugin panel components via React context
 export interface PluginPanelProps {
@@ -44,6 +45,9 @@ export interface HermesPluginAPI {
 	};
 	network: {
 		fetch(url: string): Promise<string>;
+	};
+	shell: {
+		openExternal(url: string): Promise<void>;
 	};
 	sessions: {
 		getActive(): Promise<{ id: string; name: string } | null>;
@@ -306,6 +310,14 @@ export function createPluginAPI(
 					throw new PermissionDeniedError(pluginId, "network");
 				}
 				return invoke("plugin_fetch_url", { url });
+			},
+		},
+		shell: {
+			async openExternal(url: string): Promise<void> {
+				if (!permissions.has("network")) {
+					throw new PermissionDeniedError(pluginId, "network");
+				}
+				await shellOpen(url);
 			},
 		},
 		sessions: {

@@ -7,6 +7,16 @@ Each release uses the categories: **New**, **Fixed**, **Improved**, **Removed**.
 
 ---
 
+# 0.5.6 (2026-03-14)
+
+## New
+- Plugins can now open links in the default browser via `api.shell.openExternal()`
+
+## Fixed
+- Plugin error messages now display correctly instead of showing "Unknown error"
+
+---
+
 # 0.5.5 (2026-03-14)
 
 ## Fixed
