@@ -1,0 +1,52 @@
+/* ─── Panel Resize Handle ────────────────────────────── */
+
+.panel-resize-handle {
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--border);
+  transition: background 0.15s;
+  z-index: 2;
+}
+
+.panel-resize-handle:hover {
+  background: var(--accent);
+}
+
+/* Horizontal (col-resize) — thin vertical bar */
+.panel-resize-handle-horizontal {
+  width: 4px;
+  cursor: col-resize;
+}
+
+/* Vertical (row-resize) — thin horizontal bar */
+.panel-resize-handle-vertical {
+  height: 4px;
+  cursor: row-resize;
+}
+
+/* Centered pill indicator */
+.panel-resize-pill {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  background: var(--text-3);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.panel-resize-handle:hover .panel-resize-pill {
+  opacity: 1;
+}
+
+/* Pill sizing per direction */
+.panel-resize-handle-horizontal .panel-resize-pill {
+  width: 4px;
+  height: 32px;
+}
+
+.panel-resize-handle-vertical .panel-resize-pill {
+  width: 32px;
+  height: 4px;
+}

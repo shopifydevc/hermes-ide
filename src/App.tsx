@@ -53,7 +53,7 @@ import { setSetting } from "./api/settings";
 import { SplitDirection, collectPanes } from "./state/layoutTypes";
 import { getDraggedSession } from "./components/SplitPane";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { focusTerminal } from "./terminal/TerminalPool";
+import { focusTerminal, refitActive } from "./terminal/TerminalPool";
 import { useNativeMenuEvents } from "./hooks/useNativeMenuEvents";
 import { useMenuStateSync } from "./hooks/useMenuStateSync";
 import { useAutoUpdater } from "./hooks/useAutoUpdater";
@@ -66,6 +66,7 @@ import { useToastStore } from "./hooks/useToastStore";
 import { WhatsNewDialog } from "./components/WhatsNewDialog";
 import { PluginUpdateConfirmDialog } from "./components/PluginUpdateConfirmDialog";
 import { OnboardingWizard } from "./components/OnboardingWizard";
+import { PanelResizeHandle } from "./components/PanelResizeHandle";
 
 function AppContent() {
   const { state, dispatch, createSession, closeSession, requestCloseSession, setActive, saveWorkspace } = useSession();
@@ -100,10 +101,21 @@ function AppContent() {
   const [activePluginPanel, setActivePluginPanel] = useState<string | null>(null);
   const [activeBottomPanel, setActiveBottomPanel] = useState<string | null>(null);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(300);
-  const bottomPanelDragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(240);
+  const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const toastStore = useToastStore();
   const toastStoreRef = useRef(toastStore);
   toastStoreRef.current = toastStore;
+
+  const handleLeftResize = useCallback((delta: number) => {
+    setLeftPanelWidth((w) => Math.max(180, Math.min(480, w + delta)));
+  }, []);
+  const handleRightResize = useCallback((delta: number) => {
+    setRightPanelWidth((w) => Math.max(220, Math.min(500, w - delta)));
+  }, []);
+  const handleBottomResize = useCallback((delta: number) => {
+    setBottomPanelHeight((h) => Math.max(120, Math.min(window.innerHeight * 0.8, h - delta)));
+  }, []);
 
   const pluginRuntimeRef = useRef<PluginRuntime | null>(null);
 
@@ -570,7 +582,7 @@ function AppContent() {
 
       </div>
 
-      <div className="app-body">
+      <div className="app-body" style={{ "--sidebar-w": `${leftPanelWidth}px`, "--context-w": `${rightPanelWidth}px` } as React.CSSProperties}>
         {!ui.flowMode && (
           <ActivityBar
             side="left"
@@ -675,6 +687,9 @@ function AppContent() {
           toastStore={toastStore}
           onShowUpdateConfirm={() => setPendingUpdatePlugins([...pluginUpdater.updatesAvailable])}
         />
+        {!ui.flowMode && (!ui.sessionListCollapsed || ui.gitPanelOpen || ui.processPanelOpen || ui.fileExplorerOpen || ui.searchPanelOpen || (activePluginPanel && pluginPanels.some(p => p.id === activePluginPanel && p.side === "left"))) && (
+          <PanelResizeHandle direction="horizontal" onResize={handleLeftResize} onResizeEnd={refitActive} />
+        )}
         <div className="main-area">
           <div className="terminal-and-timeline">
             {ui.filePreview && state.activeSessionId ? (
@@ -708,9 +723,12 @@ function AppContent() {
             )}
           </div>
           {ui.contextPanelOpen && !ui.flowMode && activeSession && (
-            <PanelErrorBoundary panelName="Context Panel">
-              <ContextPanel session={activeSession} />
-            </PanelErrorBoundary>
+            <>
+              <PanelResizeHandle direction="horizontal" onResize={handleRightResize} onResizeEnd={refitActive} />
+              <PanelErrorBoundary panelName="Context Panel">
+                <ContextPanel session={activeSession} />
+              </PanelErrorBoundary>
+            </>
           )}
         </div>
         {!ui.flowMode && (
@@ -733,31 +751,7 @@ function AppContent() {
         if (!PanelComponent) return null;
         return (
           <div style={{ height: bottomPanelHeight, minHeight: 120, maxHeight: "80vh", flexShrink: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            {/* Drag handle */}
-            <div
-              style={{ height: 4, cursor: "row-resize", background: "var(--border)", flexShrink: 0 }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                bottomPanelDragRef.current = { startY: e.clientY, startHeight: bottomPanelHeight };
-                const onMouseMove = (ev: MouseEvent) => {
-                  if (!bottomPanelDragRef.current) return;
-                  const delta = bottomPanelDragRef.current.startY - ev.clientY;
-                  const newHeight = Math.max(120, Math.min(window.innerHeight * 0.8, bottomPanelDragRef.current.startHeight + delta));
-                  setBottomPanelHeight(newHeight);
-                };
-                const onMouseUp = () => {
-                  bottomPanelDragRef.current = null;
-                  document.removeEventListener("mousemove", onMouseMove);
-                  document.removeEventListener("mouseup", onMouseUp);
-                  document.body.style.cursor = "";
-                  document.body.style.userSelect = "";
-                };
-                document.body.style.cursor = "row-resize";
-                document.body.style.userSelect = "none";
-                document.addEventListener("mousemove", onMouseMove);
-                document.addEventListener("mouseup", onMouseUp);
-              }}
-            />
+            <PanelResizeHandle direction="vertical" onResize={handleBottomResize} onResizeEnd={refitActive} />
             <div style={{ flex: 1, overflow: "hidden" }}>
               <PluginPanelHost pluginId={panelMeta.pluginId} panelId={activeBottomPanel} panelName={panelMeta.name}>
                 <PanelComponent pluginId={panelMeta.pluginId} panelId={activeBottomPanel} />
