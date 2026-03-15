@@ -911,6 +911,12 @@ pub fn create_session(
                     Ok(n) => {
                         let data = &buf[..n];
 
+                        // Declare outside analyzer lock scope so DB work can
+                        // access them after the lock is released.
+                        let mut completed = Vec::new();
+                        let mut recent_cmds_snapshot: Option<std::collections::VecDeque<String>> =
+                            None;
+
                         if let Ok(mut a) = analyzer_clone.lock() {
                             a.process(data);
 
@@ -923,146 +929,15 @@ pub fn create_session(
                                     .emit(&format!("cwd-changed-{}", event_session_id), &new_cwd);
                             }
 
-                            // Drain completed nodes → insert into DB + emit events
-                            let completed = a.drain_completed_nodes();
-
-                            if !completed.is_empty() {
-                                if let Ok(db) = app_clone.state::<AppState>().db.lock() {
-                                    for node in &completed {
-                                        let node_id = db
-                                            .insert_execution_node(
-                                                &event_session_id,
-                                                node.timestamp,
-                                                &node.kind,
-                                                node.input.as_deref(),
-                                                node.output_summary.as_deref(),
-                                                node.exit_code,
-                                                &node.working_dir,
-                                                node.duration_ms,
-                                                None,
-                                            )
-                                            .ok();
-
-                                        // Emit execution-node event
-                                        if let Some(id) = node_id {
-                                            let exec_node = ExecutionNode {
-                                                id,
-                                                session_id: event_session_id.clone(),
-                                                timestamp: node.timestamp,
-                                                kind: node.kind.clone(),
-                                                input: node.input.clone(),
-                                                output_summary: node.output_summary.clone(),
-                                                exit_code: node.exit_code,
-                                                working_dir: node.working_dir.clone(),
-                                                duration_ms: node.duration_ms,
-                                                metadata: None,
-                                            };
-                                            let _ = app_clone.emit(
-                                                &format!("execution-node-{}", event_session_id),
-                                                &exec_node,
-                                            );
-                                        }
-
-                                        let project_id: Option<String> =
-                                            Some(node.working_dir.clone());
-
-                                        // Command sequence tracking — push FIRST then record
-                                        if node.kind == "command" {
-                                            if let Some(ref input) = node.input {
-                                                let normalized = input
-                                                    .trim()
-                                                    .trim_start_matches('$')
-                                                    .trim()
-                                                    .to_string();
-                                                if !normalized.is_empty() {
-                                                    // Push to recent_commands first
-                                                    a.recent_commands.push_back(normalized.clone());
-                                                    if a.recent_commands.len() > 5 {
-                                                        a.recent_commands.pop_front();
-                                                    }
-
-                                                    // Now record sequences using the updated list
-                                                    let cmds: Vec<String> =
-                                                        a.recent_commands.iter().cloned().collect();
-                                                    if cmds.len() >= 2 {
-                                                        let prev: Vec<&str> = cmds
-                                                            [..cmds.len() - 1]
-                                                            .iter()
-                                                            .rev()
-                                                            .take(2)
-                                                            .map(|s| s.as_str())
-                                                            .collect::<Vec<_>>()
-                                                            .into_iter()
-                                                            .rev()
-                                                            .collect();
-                                                        let seq_json = serde_json::to_string(&prev)
-                                                            .unwrap_or_default();
-                                                        db.record_command_sequence(
-                                                            project_id.as_deref(),
-                                                            &seq_json,
-                                                            &normalized,
-                                                        )
-                                                        .ok();
-                                                    }
-                                                    if cmds.len() >= 3 {
-                                                        let prev: Vec<&str> = cmds
-                                                            [..cmds.len() - 1]
-                                                            .iter()
-                                                            .rev()
-                                                            .take(3)
-                                                            .map(|s| s.as_str())
-                                                            .collect::<Vec<_>>()
-                                                            .into_iter()
-                                                            .rev()
-                                                            .collect();
-                                                        let seq_json = serde_json::to_string(&prev)
-                                                            .unwrap_or_default();
-                                                        db.record_command_sequence(
-                                                            project_id.as_deref(),
-                                                            &seq_json,
-                                                            &normalized,
-                                                        )
-                                                        .ok();
-                                                    }
-
-                                                    // Query predictions and emit
-                                                    let seq: Vec<&str> = cmds
-                                                        .iter()
-                                                        .rev()
-                                                        .take(2)
-                                                        .collect::<Vec<_>>()
-                                                        .into_iter()
-                                                        .rev()
-                                                        .map(|s| s.as_str())
-                                                        .collect();
-                                                    let seq_json = serde_json::to_string(&seq)
-                                                        .unwrap_or_default();
-                                                    if let Ok(predictions) = db
-                                                        .predict_next_command(
-                                                            project_id.as_deref(),
-                                                            &seq_json,
-                                                            3,
-                                                        )
-                                                    {
-                                                        if !predictions.is_empty() {
-                                                            let evt = CommandPredictionEvent {
-                                                                predictions,
-                                                            };
-                                                            let _ = app_clone.emit(
-                                                                &format!(
-                                                                    "command-prediction-{}",
-                                                                    event_session_id
-                                                                ),
-                                                                &evt,
-                                                            );
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            // Drain completed nodes — processed OUTSIDE the analyzer
+                            // lock to prevent AB-BA deadlock with do_save_workspace
+                            // (which acquires db → analyzer; here we'd be analyzer → db).
+                            completed = a.drain_completed_nodes();
+                            recent_cmds_snapshot = if !completed.is_empty() {
+                                Some(a.recent_commands.clone())
+                            } else {
+                                None
+                            };
 
                             if let Some(new_phase) = a.take_pending_phase() {
                                 if let Ok(mut s) = session_clone.lock() {
@@ -1204,6 +1079,153 @@ pub fn create_session(
                                     // Phase-change paths already set it on real activity.
                                     let update = SessionUpdate::from(&*s);
                                     let _ = app_clone.emit("session-updated", &update);
+                                }
+                            }
+                        }
+
+                        // ─── DB work: analyzer lock is NOT held ──────────
+                        // Process completed execution nodes with the DB lock.
+                        // This runs after releasing the analyzer lock to maintain
+                        // consistent lock ordering (db before analyzer) and prevent
+                        // deadlocks with save_workspace_state / save_all_snapshots.
+                        if !completed.is_empty() {
+                            if let Some(mut recent_cmds) = recent_cmds_snapshot {
+                                if let Ok(db) = app_clone.state::<AppState>().db.lock() {
+                                    for node in &completed {
+                                        let node_id = db
+                                            .insert_execution_node(
+                                                &event_session_id,
+                                                node.timestamp,
+                                                &node.kind,
+                                                node.input.as_deref(),
+                                                node.output_summary.as_deref(),
+                                                node.exit_code,
+                                                &node.working_dir,
+                                                node.duration_ms,
+                                                None,
+                                            )
+                                            .ok();
+
+                                        // Emit execution-node event
+                                        if let Some(id) = node_id {
+                                            let exec_node = ExecutionNode {
+                                                id,
+                                                session_id: event_session_id.clone(),
+                                                timestamp: node.timestamp,
+                                                kind: node.kind.clone(),
+                                                input: node.input.clone(),
+                                                output_summary: node.output_summary.clone(),
+                                                exit_code: node.exit_code,
+                                                working_dir: node.working_dir.clone(),
+                                                duration_ms: node.duration_ms,
+                                                metadata: None,
+                                            };
+                                            let _ = app_clone.emit(
+                                                &format!("execution-node-{}", event_session_id),
+                                                &exec_node,
+                                            );
+                                        }
+
+                                        let project_id: Option<String> =
+                                            Some(node.working_dir.clone());
+
+                                        // Command sequence tracking — push FIRST then record
+                                        if node.kind == "command" {
+                                            if let Some(ref input) = node.input {
+                                                let normalized = input
+                                                    .trim()
+                                                    .trim_start_matches('$')
+                                                    .trim()
+                                                    .to_string();
+                                                if !normalized.is_empty() {
+                                                    recent_cmds.push_back(normalized.clone());
+                                                    if recent_cmds.len() > 5 {
+                                                        recent_cmds.pop_front();
+                                                    }
+
+                                                    let cmds: Vec<String> =
+                                                        recent_cmds.iter().cloned().collect();
+                                                    if cmds.len() >= 2 {
+                                                        let prev: Vec<&str> = cmds
+                                                            [..cmds.len() - 1]
+                                                            .iter()
+                                                            .rev()
+                                                            .take(2)
+                                                            .map(|s| s.as_str())
+                                                            .collect::<Vec<_>>()
+                                                            .into_iter()
+                                                            .rev()
+                                                            .collect();
+                                                        let seq_json = serde_json::to_string(&prev)
+                                                            .unwrap_or_default();
+                                                        db.record_command_sequence(
+                                                            project_id.as_deref(),
+                                                            &seq_json,
+                                                            &normalized,
+                                                        )
+                                                        .ok();
+                                                    }
+                                                    if cmds.len() >= 3 {
+                                                        let prev: Vec<&str> = cmds
+                                                            [..cmds.len() - 1]
+                                                            .iter()
+                                                            .rev()
+                                                            .take(3)
+                                                            .map(|s| s.as_str())
+                                                            .collect::<Vec<_>>()
+                                                            .into_iter()
+                                                            .rev()
+                                                            .collect();
+                                                        let seq_json = serde_json::to_string(&prev)
+                                                            .unwrap_or_default();
+                                                        db.record_command_sequence(
+                                                            project_id.as_deref(),
+                                                            &seq_json,
+                                                            &normalized,
+                                                        )
+                                                        .ok();
+                                                    }
+
+                                                    // Query predictions and emit
+                                                    let seq: Vec<&str> = cmds
+                                                        .iter()
+                                                        .rev()
+                                                        .take(2)
+                                                        .collect::<Vec<_>>()
+                                                        .into_iter()
+                                                        .rev()
+                                                        .map(|s| s.as_str())
+                                                        .collect();
+                                                    let seq_json = serde_json::to_string(&seq)
+                                                        .unwrap_or_default();
+                                                    if let Ok(predictions) = db
+                                                        .predict_next_command(
+                                                            project_id.as_deref(),
+                                                            &seq_json,
+                                                            3,
+                                                        )
+                                                    {
+                                                        if !predictions.is_empty() {
+                                                            let evt = CommandPredictionEvent {
+                                                                predictions,
+                                                            };
+                                                            let _ = app_clone.emit(
+                                                                &format!(
+                                                                    "command-prediction-{}",
+                                                                    event_session_id
+                                                                ),
+                                                                &evt,
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                // Write back updated recent_commands to analyzer
+                                if let Ok(mut a) = analyzer_clone.lock() {
+                                    a.recent_commands = recent_cmds;
                                 }
                             }
                         }

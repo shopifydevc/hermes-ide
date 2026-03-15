@@ -12,5 +12,6 @@
 - Sessions that share a branch with another session now show a clear warning on creation
 
 ## Fixed
+- App no longer freezes after waking from sleep with active sessions
 - Creating a session with an already checked-out branch no longer silently falls back to the wrong branch
 - Stash failures during session close are now surfaced instead of silently losing changes
