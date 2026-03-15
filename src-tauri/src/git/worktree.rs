@@ -851,6 +851,7 @@ mod tests {
             worktree_path: "/repo/.hermes/worktrees/abc_main".to_string(),
             branch_name: "main".to_string(),
             is_main_worktree: false,
+            is_shared: false,
         };
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(json["branch_name"], "main");
