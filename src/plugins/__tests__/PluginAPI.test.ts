@@ -281,4 +281,26 @@ describe("createPluginAPI", () => {
 			expect(() => api.network.fetch("https://example.com")).toThrow(PermissionDeniedError);
 		});
 	});
+
+	describe("shell.exec", () => {
+		it("should pass command and args to invoke with pluginId", async () => {
+			mockInvoke.mockResolvedValue({ stdout: "output", stderr: "", exitCode: 0 });
+			const api = createPluginAPI("my-plugin", new Set(["shell.exec"]), undefined, callbacks, commandHandlers, panelComponents);
+			const result = await api.shell.exec("echo", ["hello"]);
+			expect(mockInvoke).toHaveBeenCalledWith("plugin_exec_command", { command: "echo", args: ["hello"], pluginId: "my-plugin" });
+			expect(result.stdout).toBe("output");
+		});
+
+		it("should throw without shell.exec permission", async () => {
+			const api = createPluginAPI("test", new Set(), undefined, callbacks, commandHandlers, panelComponents);
+			await expect(api.shell.exec("echo", ["hello"])).rejects.toThrow(PermissionDeniedError);
+		});
+
+		it("should default args to empty array", async () => {
+			mockInvoke.mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 });
+			const api = createPluginAPI("my-plugin", new Set(["shell.exec"]), undefined, callbacks, commandHandlers, panelComponents);
+			await api.shell.exec("whoami");
+			expect(mockInvoke).toHaveBeenCalledWith("plugin_exec_command", { command: "whoami", args: [], pluginId: "my-plugin" });
+		});
+	});
 });

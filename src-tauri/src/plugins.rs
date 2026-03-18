@@ -335,6 +335,44 @@ pub async fn plugin_fetch_url(url: String, plugin_id: String, state: State<'_, A
         .map_err(|e| format!("Failed to read response: {}", e))
 }
 
+/// Execute a shell command and return its output.
+/// Used by plugins with the "shell.exec" permission.
+#[tauri::command]
+pub async fn plugin_exec_command(
+    command: String,
+    args: Vec<String>,
+    plugin_id: String,
+    state: State<'_, AppState>,
+) -> Result<PluginExecResult, String> {
+    {
+        let db = state.db.lock().map_err(|e| e.to_string())?;
+        if !db.has_plugin_permission(&plugin_id, "shell.exec")? {
+            return Err(format!(
+                "Plugin \"{}\" does not have \"shell.exec\" permission",
+                plugin_id
+            ));
+        }
+    }
+
+    let output = std::process::Command::new(&command)
+        .args(&args)
+        .output()
+        .map_err(|e| format!("Failed to execute command: {}", e))?;
+
+    Ok(PluginExecResult {
+        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        exit_code: output.status.code().unwrap_or(-1),
+    })
+}
+
+#[derive(Debug, Serialize)]
+pub struct PluginExecResult {
+    pub stdout: String,
+    pub stderr: String,
+    pub exit_code: i32,
+}
+
 fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
     fs::create_dir_all(dst).map_err(|e| format!("mkdir failed: {}", e))?;
     for entry in fs::read_dir(src).map_err(|e| format!("readdir failed: {}", e))? {

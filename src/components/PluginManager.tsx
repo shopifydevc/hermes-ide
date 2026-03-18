@@ -16,6 +16,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
 	"clipboard.write": "Write text to your clipboard",
 	"notifications": "Show desktop notifications",
 	"sessions.read": "Access terminal session information",
+	"shell.exec": "Execute shell commands on your system",
 };
 
 interface InstalledPluginInfo {

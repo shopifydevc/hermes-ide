@@ -50,6 +50,7 @@ export interface HermesPluginAPI {
 	};
 	shell: {
 		openExternal(url: string): Promise<void>;
+		exec(command: string, args?: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }>;
 	};
 	sessions: {
 		getActive(): Promise<SessionInfo | null>;
@@ -339,6 +340,12 @@ export function createPluginAPI(
 					throw new PermissionDeniedError(pluginId, "network");
 				}
 				await shellOpen(url);
+			},
+			async exec(command: string, args?: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+				if (!permissions.has("shell.exec")) {
+					throw new PermissionDeniedError(pluginId, "shell.exec");
+				}
+				return invoke("plugin_exec_command", { command, args: args ?? [], pluginId });
 			},
 		},
 		sessions: {

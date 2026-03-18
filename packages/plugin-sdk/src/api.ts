@@ -73,7 +73,8 @@ export type PluginPermission =
 	| "terminal.write"
 	| "sessions.read"
 	| "notifications"
-	| "network";
+	| "network"
+	| "shell.exec";
 
 // ─── Settings Schema ─────────────────────────────────────
 
@@ -172,6 +173,8 @@ export interface HermesPluginAPI {
 	shell: {
 		/** Open a URL in the user's default browser. Requires "network" permission. */
 		openExternal(url: string): Promise<void>;
+		/** Execute a shell command and return its output. Requires "shell.exec" permission. */
+		exec(command: string, args?: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }>;
 	};
 	sessions: {
 		getActive(): Promise<{ id: string; name: string } | null>;

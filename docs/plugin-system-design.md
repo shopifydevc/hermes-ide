@@ -693,6 +693,7 @@ Plugins declare the permissions they need in their manifest. Users see these per
 | `notifications` | Send desktop notifications | Low | Implemented |
 | `sessions.read` | Read session metadata, watch AI agent transcripts | Low | Implemented |
 | `network` | Make HTTP requests to external URLs, open URLs in browser | High | Implemented |
+| `shell.exec` | Execute shell commands and capture output | High | Implemented |
 | `terminal.read` | Subscribe to terminal output (raw text) for any session | Medium | Future |
 | `terminal.write` | Write text to terminal sessions | High | Future |
 | `filesystem.read` | Read files through a scoped dialog | High | Future |
@@ -1489,6 +1490,7 @@ plugins::uninstall_plugin             // Remove plugin directory
 plugins::download_and_install_plugin  // Download .tgz from URL and install
 plugins::fetch_plugin_registry        // Fetch registry JSON (bypasses CSP)
 plugins::plugin_fetch_url             // Fetch URL for plugins (requires "network" permission)
+plugins::plugin_exec_command          // Execute shell command (requires "shell.exec" permission)
 
 // Plugin storage & permissions (src-tauri/src/db/mod.rs)
 db::get_plugin_setting                // Get value (requires "storage" permission)
