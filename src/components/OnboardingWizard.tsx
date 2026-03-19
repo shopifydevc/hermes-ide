@@ -36,7 +36,7 @@ export function OnboardingWizard() {
   const [step, setStep] = useState<Step>("welcome");
 
   // Theme step
-  const [selectedTheme, setSelectedTheme] = useState("tron");
+  const [selectedTheme, setSelectedTheme] = useState("frosted-dark");
   const [selectedScale, setSelectedScale] = useState("default");
 
   // Privacy step

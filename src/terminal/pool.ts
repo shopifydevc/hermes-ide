@@ -103,8 +103,8 @@ export async function createTerminal(
   }
   creating.add(sessionId);
 
-  const themeName = currentSettings.theme || "tron";
-  const theme = THEMES[themeName] || THEMES.tron;
+  const themeName = currentSettings.theme || "frosted-dark";
+  const theme = THEMES[themeName] || THEMES["frosted-dark"];
   const fontSize = parseInt(currentSettings.font_size || "14", 10);
   const fontFamily = FONT_FAMILIES[currentSettings.font_family || "default"] || FONT_FAMILIES.default;
   const scrollback = parseInt(currentSettings.scrollback || "10000", 10);

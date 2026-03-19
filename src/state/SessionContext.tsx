@@ -733,7 +733,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Load settings first, THEN sessions (so terminals use correct settings)
     getSettings()
       .then((s) => {
-        applyTheme(s.theme || "tron", s);
+        const theme = s.theme || "frosted-dark";
+        applyTheme(theme, s);
         restoreWindowState(s).catch(console.error);
         if (s.execution_mode === "assisted" || s.execution_mode === "autonomous") {
           dispatch({ type: "SET_DEFAULT_MODE", mode: s.execution_mode as ExecutionMode });

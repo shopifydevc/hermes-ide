@@ -236,7 +236,7 @@ const THEME_COLORS: Record<string, string> = {
 
 function ThemePicker() {
   const [open, setOpen] = useState(false);
-  const [current, setCurrent] = useState("tron");
+  const [current, setCurrent] = useState("frosted-dark");
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);

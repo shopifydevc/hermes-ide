@@ -69,8 +69,8 @@ const SUGGESTION_DEBOUNCE_MS = 50;
 export function updateSettings(settings: Record<string, string>): void {
   setCurrentSettings(settings);
   // Apply to all existing terminals
-  const themeName = settings.theme || "tron";
-  const theme = THEMES[themeName] || THEMES.tron;
+  const themeName = settings.theme || "frosted-dark";
+  const theme = THEMES[themeName] || THEMES["frosted-dark"];
   const fontSize = parseInt(settings.font_size || "14", 10);
   const fontFamily = FONT_FAMILIES[settings.font_family || "default"] || FONT_FAMILIES.default;
   const scrollback = parseInt(settings.scrollback || "10000", 10);
