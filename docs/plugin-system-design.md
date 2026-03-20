@@ -1046,7 +1046,7 @@ Long-term, built-in features like the Git panel could be extracted as plugins. T
 5. The `ui.gitPanelOpen` state moves to the plugin's internal state, managed via `hermes.ui.showPanel()` / `hermes.ui.hidePanel()`.
 
 **Why not extract immediately:**
-- The Git panel is tightly integrated with session state (worktree resolution per session, realm attachments).
+- The Git panel is tightly integrated with session state (worktree resolution per session, project attachments).
 - Performance sensitivity -- Git status polling at 3s intervals needs to stay efficient.
 - The cost of the abstraction layer is not justified until there are other similar use cases.
 

@@ -2,14 +2,14 @@ import { useEffect, useCallback, useRef } from "react";
 import "../styles/components/DirtyWorktreeDialog.css";
 
 export interface DirtyWorktreeChange {
-  realmId: string;
-  realmName: string;
+  projectId: string;
+  projectName: string;
   branchName: string | null;
   files: Array<{ path: string; status: string }>;
 }
 
 export interface StashError {
-  realmName: string;
+  projectName: string;
   error: string;
 }
 
@@ -123,9 +123,9 @@ export function DirtyWorktreeDialog({
           </p>
 
           {changes.map((change) => (
-            <div key={change.realmId} className="dirty-wt-project">
+            <div key={change.projectId} className="dirty-wt-project">
               <div className="dirty-wt-project-header">
-                <span className="dirty-wt-project-name">{change.realmName}</span>
+                <span className="dirty-wt-project-name">{change.projectName}</span>
                 {change.branchName && (
                   <span className="dirty-wt-branch-name">{change.branchName}</span>
                 )}
@@ -149,7 +149,7 @@ export function DirtyWorktreeDialog({
           <div className="dirty-wt-errors">
             {stashErrors.map((err, i) => (
               <div key={i} className="dirty-wt-error-item">
-                <span className="dirty-wt-error-label">Stash failed for {err.realmName}:</span>{" "}
+                <span className="dirty-wt-error-label">Stash failed for {err.projectName}:</span>{" "}
                 <span className="dirty-wt-error-message">{err.error}</span>
                 <p className="dirty-wt-error-hint">Your changes are still in the working directory.</p>
               </div>

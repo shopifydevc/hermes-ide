@@ -6,7 +6,7 @@ import type { ConflictContent, ConflictStrategy } from "../types/git";
 
 interface GitConflictViewerProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
   filePath: string;
   onResolve: (filePath: string, strategy: ConflictStrategy) => void;
   onClose: () => void;
@@ -47,7 +47,7 @@ const MARKER_CLASS_MAP: Record<MarkerType, string> = {
 
 export function GitConflictViewer({
   sessionId,
-  realmId,
+  projectId,
   filePath,
   onResolve,
   onClose,
@@ -62,7 +62,7 @@ export function GitConflictViewer({
     setLoading(true);
     setError(null);
 
-    gitGetConflictContent(sessionId, realmId, filePath)
+    gitGetConflictContent(sessionId, projectId, filePath)
       .then((c) => {
         if (!cancelled) { setContent(c); setLoading(false); }
       })
@@ -70,7 +70,7 @@ export function GitConflictViewer({
         if (!cancelled) { setError(String(e)); setLoading(false); }
       });
     return () => { cancelled = true; };
-  }, [sessionId, realmId, filePath]);
+  }, [sessionId, projectId, filePath]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

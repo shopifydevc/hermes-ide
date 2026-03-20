@@ -153,9 +153,9 @@ function DomainSection({ sessionId }: { sessionId: string }) {
     let unlisten: (() => void) | null = null;
     let unlistenGlobal: (() => void) | null = null;
 
-    listen(`session-realms-updated-${sessionId}`, fetchProjects)
+    listen(`session-projects-updated-${sessionId}`, fetchProjects)
       .then((u) => { if (mounted) unlisten = u; else u(); });
-    listen("realm-updated", fetchProjects)
+    listen("project-updated", fetchProjects)
       .then((u) => { if (mounted) unlistenGlobal = u; else u(); });
 
     return () => {
@@ -293,8 +293,8 @@ export function ContextPanel({ session }: ContextPanelProps) {
   const [copyDone, setCopyDone] = useState(false);
 
   // Derive primary project id for project-scoped operations
-  const primaryProjectId = contextManager.context.realms.length > 0
-    ? contextManager.context.realms[0].realm_id
+  const primaryProjectId = contextManager.context.projects.length > 0
+    ? contextManager.context.projects[0].project_id
     : null;
 
   // Pins come from contextManager (single source of truth via backend events)
@@ -820,7 +820,7 @@ export function ContextPanel({ session }: ContextPanelProps) {
           </div>
         )}
 
-        {/* Domain — Attached Realms */}
+        {/* Domain — Attached Projects */}
         <DomainSection sessionId={session.id} />
 
         {/* Workspace — compact CWD with click-to-expand */}

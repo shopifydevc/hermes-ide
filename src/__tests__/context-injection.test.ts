@@ -49,7 +49,7 @@ function makeBaseContext(overrides?: Partial<ContextState>): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",
@@ -197,11 +197,11 @@ describe("Suite 2: Dirty Detection", () => {
     expect(withPin).not.toBe(without);
   });
 
-  it("Context JSON comparison detects realm changes", () => {
+  it("Context JSON comparison detects project changes", () => {
     const before = JSON.stringify(makeBaseContext());
     const after = JSON.stringify(makeBaseContext({
-      realms: [{
-        realm_id: "r1", realm_name: "test", path: "/test",
+      projects: [{
+        project_id: "r1", project_name: "test", path: "/test",
         languages: ["TypeScript"], frameworks: [], architecture_pattern: null,
         architecture_layers: [], conventions: [], scan_status: "deep",
       }],
@@ -392,8 +392,8 @@ describe("Suite 5: Injection Formatting", () => {
 
   it("formatContextMarkdown includes projects", () => {
     const ctx = makeBaseContext({
-      realms: [{
-        realm_id: "r1", realm_name: "my-project", path: "/home/user/my-project",
+      projects: [{
+        project_id: "r1", project_name: "my-project", path: "/home/user/my-project",
         languages: ["TypeScript", "Python"], frameworks: ["React"],
         architecture_pattern: "MVC", architecture_layers: [],
         conventions: ["Use camelCase"], scan_status: "deep",

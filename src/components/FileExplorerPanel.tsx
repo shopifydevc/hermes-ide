@@ -116,16 +116,16 @@ const STATUS_LETTERS: Record<string, string> = {
 
 interface ProjectTreeProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
   projectName: string;
   showHidden: boolean;
   searchQuery: string;
   onFileContextMenu?: (e: React.MouseEvent, entry: FileEntry) => void;
-  onFilePreview?: (realmId: string, filePath: string) => void;
+  onFilePreview?: (projectId: string, filePath: string) => void;
 }
 
-function ProjectTree({ sessionId, realmId, projectName, showHidden, searchQuery, onFileContextMenu, onFilePreview }: ProjectTreeProps) {
-  const { expandedDirs, loadingDirs, error, loadDirectory, toggleDir, refresh, getEntries } = useFileExplorer(sessionId, realmId);
+function ProjectTree({ sessionId, projectId, projectName, showHidden, searchQuery, onFileContextMenu, onFilePreview }: ProjectTreeProps) {
+  const { expandedDirs, loadingDirs, error, loadDirectory, toggleDir, refresh, getEntries } = useFileExplorer(sessionId, projectId);
 
   // Load root on mount
   useEffect(() => {
@@ -139,9 +139,9 @@ function ProjectTree({ sessionId, realmId, projectName, showHidden, searchQuery,
     if (entry.is_dir) {
       toggleDir(entry.path);
     } else if (onFilePreview) {
-      onFilePreview(realmId, entry.path);
+      onFilePreview(projectId, entry.path);
     }
-  }, [realmId, toggleDir, onFilePreview]);
+  }, [projectId, toggleDir, onFilePreview]);
 
   return (
     <div className="file-explorer-project">
@@ -481,7 +481,7 @@ export function FileExplorerPanel({ visible }: FileExplorerPanelProps) {
   const isSSH = !!(activeSession?.ssh_info);
 
   const contextEntryRef = useRef<FileEntry | null>(null);
-  const contextRealmRef = useRef<string>("");
+  const contextProjectRef = useRef<string>("");
 
   const handleFileExplorerAction = useCallback((actionId: string) => {
     const entry = contextEntryRef.current;
@@ -494,11 +494,11 @@ export function FileExplorerPanel({ visible }: FileExplorerPanelProps) {
         // Open terminal at the entry's directory
         break;
       case "file-explorer.open-in-editor": {
-        const realmId = contextRealmRef.current;
+        const projectId = contextProjectRef.current;
         const sessionId = state.activeSessionId;
-        if (!sessionId || !realmId) break;
+        if (!sessionId || !projectId) break;
         getSettings()
-          .then((s) => openFileInEditor(sessionId, realmId, entry.path, s.preferred_editor || null))
+          .then((s) => openFileInEditor(sessionId, projectId, entry.path, s.preferred_editor || null))
           .catch(console.error);
         break;
       }
@@ -513,19 +513,19 @@ export function FileExplorerPanel({ visible }: FileExplorerPanelProps) {
 
   const { showMenu: showEmptyMenu } = useContextMenu(handleEmptyAreaAction);
 
-  const handleFileContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry, realmId?: string) => {
+  const handleFileContextMenu = useCallback((e: React.MouseEvent, entry: FileEntry, projectId?: string) => {
     contextEntryRef.current = entry;
-    if (realmId) contextRealmRef.current = realmId;
+    if (projectId) contextProjectRef.current = projectId;
     showFileMenu(e, buildFileExplorerMenuItems({ name: entry.name, is_dir: entry.is_dir, path: entry.path }));
   }, [showFileMenu]);
 
-  const handleFilePreview = useCallback((realmId: string, filePath: string) => {
-    dispatch({ type: "SET_FILE_PREVIEW", realmId, filePath });
+  const handleFilePreview = useCallback((projectId: string, filePath: string) => {
+    dispatch({ type: "SET_FILE_PREVIEW", projectId, filePath });
   }, [dispatch]);
 
   const handleSshFilePreview = useCallback((filePath: string) => {
-    // For SSH, use "__ssh__" as a sentinel realmId
-    dispatch({ type: "SET_FILE_PREVIEW", realmId: "__ssh__", filePath });
+    // For SSH, use "__ssh__" as a sentinel projectId
+    dispatch({ type: "SET_FILE_PREVIEW", projectId: "__ssh__", filePath });
   }, [dispatch]);
 
   const handleSshDownload = useCallback(async (remotePath: string, fileName: string) => {
@@ -636,8 +636,8 @@ export function FileExplorerPanel({ visible }: FileExplorerPanelProps) {
       return;
     }
     getSessionProjects(state.activeSessionId)
-      .then((realms) => {
-        setProjects(realms.map((r) => ({ id: r.id, name: r.name, path: r.path })));
+      .then((projects) => {
+        setProjects(projects.map((r) => ({ id: r.id, name: r.name, path: r.path })));
       })
       .catch(() => setProjects([]));
   }, [state.activeSessionId, visible]);
@@ -700,7 +700,7 @@ export function FileExplorerPanel({ visible }: FileExplorerPanelProps) {
               <ProjectTree
                 key={p.id}
                 sessionId={state.activeSessionId!}
-                realmId={p.id}
+                projectId={p.id}
                 projectName={p.name}
                 showHidden={showHidden}
                 searchQuery={searchQuery}

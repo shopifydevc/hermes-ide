@@ -63,10 +63,10 @@ function formatWorktreeError(raw: string): string {
 
 // ─── Types ────────────────────────────────────────────────────────────
 
-interface RealmGroup {
-  realmId: string;
-  realmName: string;
-  realmPath: string;
+interface ProjectGroup {
+  projectId: string;
+  projectName: string;
+  rootPath: string;
   worktrees: WorktreeOverviewEntry[];
   orphans: OrphanWorktree[];
 }
@@ -85,7 +85,7 @@ export function WorktreeOverviewPanel() {
   const [cleaning, setCleaning] = useState(false);
   const [confirmCleanup, setConfirmCleanup] = useState(false);
   const [cleanupResults, setCleanupResults] = useState<CleanupResult[] | null>(null);
-  const [expandedRealms, setExpandedRealms] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   // Load data on mount
   useEffect(() => {
@@ -111,9 +111,9 @@ export function WorktreeOverviewPanel() {
       ]);
       setWorktrees(wts);
       setOrphans(orps);
-      // Auto-expand all realms on first load
-      const realmIds = new Set(wts.map((w) => w.realm_id));
-      setExpandedRealms(realmIds);
+      // Auto-expand all projects on first load
+      const projectIds = new Set(wts.map((w) => w.project_id));
+      setExpandedProjects(projectIds);
     } catch (e) {
       console.error("Failed to load worktree overview:", e);
       setError(formatWorktreeError(String(e)));
@@ -122,31 +122,31 @@ export function WorktreeOverviewPanel() {
     }
   }, []);
 
-  // Group worktrees by realm
-  const realmGroups = useMemo((): RealmGroup[] => {
-    const groupMap = new Map<string, RealmGroup>();
+  // Group worktrees by project
+  const projectGroups = useMemo((): ProjectGroup[] => {
+    const groupMap = new Map<string, ProjectGroup>();
 
     for (const wt of worktrees) {
-      let group = groupMap.get(wt.realm_id);
+      let group = groupMap.get(wt.project_id);
       if (!group) {
         group = {
-          realmId: wt.realm_id,
-          realmName: wt.realm_name,
-          realmPath: wt.realm_path,
+          projectId: wt.project_id,
+          projectName: wt.project_name,
+          rootPath: wt.root_path,
           worktrees: [],
           orphans: [],
         };
-        groupMap.set(wt.realm_id, group);
+        groupMap.set(wt.project_id, group);
       }
       group.worktrees.push(wt);
     }
 
-    // Attach orphans to matching realm groups by realm_path, or create standalone groups
+    // Attach orphans to matching project groups by root_path, or create standalone groups
     for (const orphan of orphans) {
       let placed = false;
-      if (orphan.realm_path) {
+      if (orphan.root_path) {
         for (const group of groupMap.values()) {
-          if (group.realmPath === orphan.realm_path) {
+          if (group.rootPath === orphan.root_path) {
             group.orphans.push(orphan);
             placed = true;
             break;
@@ -154,14 +154,14 @@ export function WorktreeOverviewPanel() {
         }
       }
       if (!placed) {
-        // Create a standalone group for orphans without a matching realm
-        const key = orphan.realm_path || orphan.worktree_path;
+        // Create a standalone group for orphans without a matching project
+        const key = orphan.root_path || orphan.worktree_path;
         let group = groupMap.get(key);
         if (!group) {
           group = {
-            realmId: key,
-            realmName: orphan.realm_path ? orphan.realm_path.split("/").pop() || "Unknown" : "Orphaned",
-            realmPath: orphan.realm_path || "",
+            projectId: key,
+            projectName: orphan.root_path ? orphan.root_path.split("/").pop() || "Unknown" : "Orphaned",
+            rootPath: orphan.root_path || "",
             worktrees: [],
             orphans: [],
           };
@@ -175,17 +175,17 @@ export function WorktreeOverviewPanel() {
   }, [worktrees, orphans]);
 
   // Apply search filter
-  const filteredGroups = useMemo((): RealmGroup[] => {
-    if (!search.trim()) return realmGroups;
+  const filteredGroups = useMemo((): ProjectGroup[] => {
+    if (!search.trim()) return projectGroups;
     const q = search.toLowerCase();
-    return realmGroups
+    return projectGroups
       .map((group) => ({
         ...group,
         worktrees: group.worktrees.filter(
           (wt) =>
             (wt.branch_name && wt.branch_name.toLowerCase().includes(q)) ||
             wt.session_label.toLowerCase().includes(q) ||
-            wt.realm_name.toLowerCase().includes(q),
+            wt.project_name.toLowerCase().includes(q),
         ),
         orphans: group.orphans.filter(
           (o) =>
@@ -194,7 +194,7 @@ export function WorktreeOverviewPanel() {
         ),
       }))
       .filter((g) => g.worktrees.length > 0 || g.orphans.length > 0);
-  }, [realmGroups, search]);
+  }, [projectGroups, search]);
 
   // Total stats
   const totalWorktrees = worktrees.length + orphans.length;
@@ -219,11 +219,11 @@ export function WorktreeOverviewPanel() {
     }
   }, [diskUsage, diskLoading]);
 
-  const toggleRealm = useCallback((realmId: string) => {
-    setExpandedRealms((prev) => {
+  const toggleProject = useCallback((projectId: string) => {
+    setExpandedProjects((prev) => {
       const next = new Set(prev);
-      if (next.has(realmId)) next.delete(realmId);
-      else next.add(realmId);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
       return next;
     });
   }, []);
@@ -325,42 +325,42 @@ export function WorktreeOverviewPanel() {
         )}
 
         {filteredGroups.map((group) => {
-          const isExpanded = expandedRealms.has(group.realmId);
+          const isExpanded = expandedProjects.has(group.projectId);
           const entryCount = group.worktrees.length + group.orphans.length;
 
           return (
-            <div key={group.realmId} className="worktree-overview-realm">
-              {/* Realm Header */}
+            <div key={group.projectId} className="worktree-overview-project">
+              {/* Project Header */}
               <div
-                className="worktree-overview-realm-header"
-                onClick={() => toggleRealm(group.realmId)}
+                className="worktree-overview-project-header"
+                onClick={() => toggleProject(group.projectId)}
               >
                 <span
-                  className={`worktree-overview-realm-chevron ${isExpanded ? "worktree-overview-realm-chevron-open" : ""}`}
+                  className={`worktree-overview-project-chevron ${isExpanded ? "worktree-overview-project-chevron-open" : ""}`}
                 >
                   &#9656;
                 </span>
-                <span className="worktree-overview-realm-name">
-                  {group.realmName}
+                <span className="worktree-overview-project-name">
+                  {group.projectName}
                 </span>
-                <span className="worktree-overview-realm-count">
+                <span className="worktree-overview-project-count">
                   {entryCount}
                 </span>
               </div>
 
-              {isExpanded && group.realmPath && (
+              {isExpanded && group.rootPath && (
                 <div
-                  className="worktree-overview-realm-path"
-                  title={group.realmPath}
+                  className="worktree-overview-project-path"
+                  title={group.rootPath}
                 >
-                  <span className="worktree-overview-realm-path-text">
-                    {truncatePath(group.realmPath)}
+                  <span className="worktree-overview-project-path-text">
+                    {truncatePath(group.rootPath)}
                   </span>
                 </div>
               )}
 
               {isExpanded && (
-                <div className="worktree-overview-realm-body">
+                <div className="worktree-overview-project-body">
                   {/* Active worktrees */}
                   {group.worktrees.map((wt) => (
                     <div key={wt.worktree_path} className="worktree-overview-entry">

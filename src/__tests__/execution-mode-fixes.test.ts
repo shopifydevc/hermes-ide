@@ -107,7 +107,7 @@ describe("FIX 2 — executionMode removed from ContextState, lives in formatCont
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",

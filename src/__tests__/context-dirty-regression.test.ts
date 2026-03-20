@@ -151,10 +151,10 @@ describe("Context dirty regression: sessionSyncKey guard", () => {
 describe("Context dirty regression: project listener guard", () => {
   it("structuralEqual returns true for identical project data with new references", () => {
     const projects1 = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: ["camelCase"] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: ["camelCase"] },
     ];
     const projects2 = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: ["camelCase"] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: ["camelCase"] },
     ];
 
     // Different references
@@ -165,10 +165,10 @@ describe("Context dirty regression: project listener guard", () => {
 
   it("structuralEqual returns false when project data actually changes", () => {
     const projects1 = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: [] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: ["React"], conventions: [] },
     ];
     const projects2 = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript", "JavaScript"], frameworks: ["React"], conventions: [] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript", "JavaScript"], frameworks: ["React"], conventions: [] },
     ];
 
     expect(structuralEqual(projects1, projects2)).toBe(false);
@@ -176,19 +176,19 @@ describe("Context dirty regression: project listener guard", () => {
 
   it("setContext guard returns prev when projects unchanged (no version bump)", () => {
     const prevContext = {
-      realms: [
-        { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
+      projects: [
+        { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
       ],
     };
 
     const newProjects = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
     ];
 
     // Simulate the guarded setContext callback
     const updater = (prev: typeof prevContext) => {
-      if (structuralEqual(prev.realms, newProjects)) return prev; // no-op
-      return { ...prev, realms: newProjects };
+      if (structuralEqual(prev.projects, newProjects)) return prev; // no-op
+      return { ...prev, projects: newProjects };
     };
 
     const result = updater(prevContext);
@@ -198,23 +198,23 @@ describe("Context dirty regression: project listener guard", () => {
 
   it("setContext guard returns new object when projects actually changed", () => {
     const prevContext = {
-      realms: [
-        { realm_id: "r1", realm_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
+      projects: [
+        { project_id: "r1", project_name: "proj", languages: ["TypeScript"], frameworks: [], conventions: [] },
       ],
     };
 
     const newProjects = [
-      { realm_id: "r1", realm_name: "proj", languages: ["TypeScript", "Rust"], frameworks: [], conventions: [] },
+      { project_id: "r1", project_name: "proj", languages: ["TypeScript", "Rust"], frameworks: [], conventions: [] },
     ];
 
     const updater = (prev: typeof prevContext) => {
-      if (structuralEqual(prev.realms, newProjects)) return prev;
-      return { ...prev, realms: newProjects };
+      if (structuralEqual(prev.projects, newProjects)) return prev;
+      return { ...prev, projects: newProjects };
     };
 
     const result = updater(prevContext);
     expect(result).not.toBe(prevContext);
-    expect(result.realms).toEqual(newProjects);
+    expect(result.projects).toEqual(newProjects);
   });
 
   it("empty projects → empty projects stays clean", () => {
@@ -250,7 +250,7 @@ describe("Context dirty regression: initial load lifecycle", () => {
       pinnedItems: [],
       memoryFacts: [],
       persistedMemory: [],
-      realms: [],
+      projects: [],
       workspacePaths: [],
       workingDirectory: "",
       agent: null,
@@ -269,7 +269,7 @@ describe("Context dirty regression: initial load lifecycle", () => {
       pinnedItems: [],
       memoryFacts: [],
       persistedMemory: [],
-      realms: [],
+      projects: [],
       workspacePaths: [],
       workingDirectory: "",
       agent: null,
@@ -280,7 +280,7 @@ describe("Context dirty regression: initial load lifecycle", () => {
     const initial = {
       ...emptyCtx,
       workingDirectory: "/home/user/project",
-      realms: [{ realm_id: "r1", realm_name: "my-project", languages: ["TypeScript"] }],
+      projects: [{ project_id: "r1", project_name: "my-project", languages: ["TypeScript"] }],
     };
 
     // FIX: set prevContextRef BEFORE setContext
@@ -297,7 +297,7 @@ describe("Context dirty regression: initial load lifecycle", () => {
       pinnedItems: [],
       memoryFacts: [],
       persistedMemory: [],
-      realms: [{ realm_id: "r1", realm_name: "proj", languages: ["TypeScript"] }],
+      projects: [{ project_id: "r1", project_name: "proj", languages: ["TypeScript"] }],
       workspacePaths: [],
       workingDirectory: "/home/user/project",
       agent: null,
@@ -324,7 +324,7 @@ describe("Context dirty regression: version increment rules", () => {
     const ctx1 = {
       pinnedItems: [],
       memoryFacts: [],
-      realms: [{ realm_id: "r1", languages: ["TS"] }],
+      projects: [{ project_id: "r1", languages: ["TS"] }],
       workingDirectory: "/home",
     };
     const ctx2 = structuralClone(ctx1);
@@ -336,7 +336,7 @@ describe("Context dirty regression: version increment rules", () => {
     const ctx1 = {
       pinnedItems: [],
       memoryFacts: [],
-      realms: [{ realm_id: "r1", languages: ["TS"] }],
+      projects: [{ project_id: "r1", languages: ["TS"] }],
       workingDirectory: "/home",
     };
     const ctx2 = structuralClone(ctx1);

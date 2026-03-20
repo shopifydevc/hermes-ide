@@ -41,7 +41,7 @@ function makeContext(overrides?: Partial<ContextState>): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",
@@ -97,8 +97,8 @@ describe("Invariant: formatContextMarkdown excludes ephemeral data", () => {
         priority: 256, created_at: 1000,
       }],
       persistedMemory: [{ key: "db_host", value: "localhost", source: "user" }],
-      realms: [{
-        realm_id: "r1", realm_name: "test", path: "/test",
+      projects: [{
+        project_id: "r1", project_name: "test", path: "/test",
         languages: ["TypeScript"], frameworks: ["React"],
         architecture_pattern: "MVC", architecture_layers: [],
         conventions: ["strict"], scan_status: "deep",
@@ -217,7 +217,7 @@ describe("Invariant: auto-apply isolation", () => {
     expect(keys).toContain("pinnedItems");
     expect(keys).toContain("memoryFacts");
     expect(keys).toContain("persistedMemory");
-    expect(keys).toContain("realms");
+    expect(keys).toContain("projects");
     expect(keys).toContain("workspacePaths");
     expect(keys).toContain("workingDirectory");
     expect(keys).toContain("agent");

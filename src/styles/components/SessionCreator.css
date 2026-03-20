@@ -673,13 +673,13 @@
 .session-creator-branch-multi::-webkit-scrollbar { width: 4px; }
 .session-creator-branch-multi::-webkit-scrollbar-thumb { background: var(--bg-3); }
 
-.session-creator-branch-realm {
+.session-creator-branch-project {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
 }
 
-.session-creator-branch-realm-header {
+.session-creator-branch-project-header {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -688,26 +688,26 @@
   transition: background 0.1s;
 }
 
-.session-creator-branch-realm.expanded > .session-creator-branch-realm-header {
+.session-creator-branch-project.expanded > .session-creator-branch-project-header {
   border-bottom: 1px solid var(--border);
 }
 
-.session-creator-branch-realm-header:hover {
+.session-creator-branch-project-header:hover {
   background: var(--bg-hover);
 }
 
-.session-creator-branch-realm-chevron {
+.session-creator-branch-project-chevron {
   font-size: 10px;
   color: var(--text-3);
   flex-shrink: 0;
   transition: color 0.15s;
 }
 
-.session-creator-branch-realm-header:hover .session-creator-branch-realm-chevron {
+.session-creator-branch-project-header:hover .session-creator-branch-project-chevron {
   color: var(--text-1);
 }
 
-.session-creator-branch-realm-name {
+.session-creator-branch-project-name {
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--text-0);

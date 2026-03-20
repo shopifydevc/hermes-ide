@@ -77,7 +77,7 @@ function makeContext(overrides?: Partial<ContextState>): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",
@@ -154,7 +154,7 @@ describe("structuralEqual", () => {
       pinnedItems: [],
       memoryFacts: [],
       persistedMemory: [],
-      realms: [],
+      projects: [],
       workspacePaths: [],
       workingDirectory: "/home/user/project",
     };

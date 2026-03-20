@@ -54,7 +54,7 @@ function makeBaseContext(overrides?: Partial<ContextState>): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",
@@ -103,7 +103,7 @@ function makeProjectPin(target: string, label?: string): ContextPin {
   return {
     id: Math.floor(Math.random() * 10000),
     session_id: null,       // project-scoped (no session)
-    project_id: "realm-1",  // attached to a project
+    project_id: "project-1",  // attached to a project
     kind: "file",
     target,
     label: label ?? null,
@@ -133,7 +133,7 @@ describe("Suite 1: Project-Scoped Pins", () => {
   it("project-scoped pins have null session_id", () => {
     const pin = makeProjectPin("/src/main.ts");
     expect(pin.session_id).toBeNull();
-    expect(pin.project_id).toBe("realm-1");
+    expect(pin.project_id).toBe("project-1");
   });
 
   it("session-scoped pins have a session_id", () => {
@@ -276,14 +276,14 @@ describe("Suite 3: Token Budget in ApplyContextResult", () => {
 describe("Suite 4: Context Fork Semantics", () => {
   it("forked sessions share the same project context data", () => {
     const sharedProject = {
-      realm_id: "r1", realm_name: "my-project", path: "/home/user/my-project",
+      project_id: "r1", project_name: "my-project", path: "/home/user/my-project",
       languages: ["TypeScript"], frameworks: ["React"],
       architecture_pattern: "MVC", architecture_layers: [],
       conventions: ["camelCase"], scan_status: "deep",
     };
 
-    const ctx1 = makeBaseContext({ realms: [sharedProject] });
-    const ctx2 = makeBaseContext({ realms: [sharedProject] });
+    const ctx1 = makeBaseContext({ projects: [sharedProject] });
+    const ctx2 = makeBaseContext({ projects: [sharedProject] });
 
     const out1 = formatContextMarkdown(ctx1, 1, "manual");
     const out2 = formatContextMarkdown(ctx2, 2, "manual");
@@ -473,8 +473,8 @@ describe("Suite 8: Full Scoped Context Lifecycle", () => {
         { key: "api_url", value: "https://api.dev.com", source: "agent", confidence: 0.5 },
         { key: "current_branch", value: "feature/scoping", source: "agent", confidence: 0.9 },
       ],
-      realms: [{
-        realm_id: "r1", realm_name: "my-app", path: "/home/user/my-app",
+      projects: [{
+        project_id: "r1", project_name: "my-app", path: "/home/user/my-app",
         languages: ["TypeScript", "Rust"], frameworks: ["React", "Tauri"],
         architecture_pattern: "Tauri", architecture_layers: [],
         conventions: ["Use strict TypeScript", "Prefer functional components"],

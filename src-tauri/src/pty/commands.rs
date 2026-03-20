@@ -532,7 +532,7 @@ pub fn create_session(
     color: Option<String>,
     workspace_paths: Option<Vec<String>>,
     ai_provider: Option<String>,
-    realm_ids: Option<Vec<String>>,
+    project_ids: Option<Vec<String>>,
     auto_approve: Option<bool>,
     ssh_host: Option<String>,
     ssh_port: Option<u16>,
@@ -622,7 +622,7 @@ pub fn create_session(
         auto_approve: auto_approve.unwrap_or(false),
         context_injected: false,
         has_initial_context: ssh_host.is_none()
-            && realm_ids.as_ref().is_some_and(|ids| !ids.is_empty()),
+            && project_ids.as_ref().is_some_and(|ids| !ids.is_empty()),
         last_nudged_version: 0,
         pending_nudge: None,
         ssh_info: ssh_host.as_ref().map(|host| SshConnectionInfo {
@@ -815,7 +815,8 @@ pub fn create_session(
 
     // Set context file env vars for local sessions only (not useful over SSH)
     if !is_ssh {
-        if let Ok(context_path) = crate::realm::attunement::session_context_path(&app, &session_id)
+        if let Ok(context_path) =
+            crate::project::attunement::session_context_path(&app, &session_id)
         {
             cmd.env("HERMES_CONTEXT", context_path.to_string_lossy().as_ref());
         }
@@ -1419,16 +1420,16 @@ pub fn create_session(
         let db = state.db.lock().map_err(|e| e.to_string())?;
         db.create_session_v2(&result).ok();
 
-        // Attach realms if provided
-        if let Some(ref ids) = realm_ids {
-            for realm_id in ids {
-                db.attach_session_realm(&session_id, realm_id, "primary")
+        // Attach projects if provided
+        if let Some(ref ids) = project_ids {
+            for proj_id in ids {
+                db.attach_session_project(&session_id, proj_id, "primary")
                     .ok();
             }
             // Write context file so AI agents can read project info
             // (only for local sessions — the file isn't accessible over SSH)
             if !is_ssh && !ids.is_empty() {
-                crate::realm::attunement::write_session_context_file(&app, &db, &session_id).ok();
+                crate::project::attunement::write_session_context_file(&app, &db, &session_id).ok();
             }
         }
     }
@@ -1680,12 +1681,15 @@ pub fn is_shell_foreground(state: State<'_, AppState>, session_id: String) -> Re
 }
 
 #[tauri::command]
-pub fn nudge_realm_context(state: State<'_, AppState>, session_id: String) -> Result<bool, String> {
-    // Check if there are realms attached
+pub fn nudge_project_context(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<bool, String> {
+    // Check if there are projects attached
     let has_context = {
         let db = state.db.lock().map_err(|e| e.to_string())?;
-        let realms = db.get_session_realms(&session_id)?;
-        !realms.is_empty()
+        let projects = db.get_session_projects(&session_id)?;
+        !projects.is_empty()
     };
 
     if !has_context {
@@ -1863,7 +1867,7 @@ pub fn close_session(
         let _ = app.emit("session-removed", &session_id);
 
         // Clean up context file
-        crate::realm::attunement::delete_session_context_file(&app, &session_id);
+        crate::project::attunement::delete_session_context_file(&app, &session_id);
 
         // Clean up session-scoped pins (project-scoped pins survive)
         if let Ok(db) = state.db.lock() {
@@ -1878,10 +1882,10 @@ pub fn close_session(
                         if wt.is_main_worktree {
                             continue; // Don't remove the main worktree
                         }
-                        // Look up realm path to run git worktree remove
-                        if let Ok(Some(realm)) = db.get_realm(&wt.realm_id) {
+                        // Look up project path to run git worktree remove
+                        if let Ok(Some(proj)) = db.get_project(&wt.project_id) {
                             if let Err(e) = crate::git::worktree::remove_worktree(
-                                &realm.path,
+                                &proj.path,
                                 &session_id,
                                 &wt.worktree_path,
                             ) {

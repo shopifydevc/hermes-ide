@@ -1,11 +1,11 @@
 import "../styles/components/SessionBranchSelector.css";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { gitListBranchesForRealm, listWorktrees, checkBranchAvailable } from "../api/git";
+import { gitListBranchesForProject, listWorktrees, checkBranchAvailable } from "../api/git";
 import { validateBranchName } from "./GitBranchSelector";
 import type { GitBranch, WorktreeInfo } from "../types/git";
 
 interface SessionBranchSelectorProps {
-  realmId: string;
+  projectId: string;
   onBranchSelected: (branchName: string, createNew: boolean) => void;
   onSkip: () => void;
 }
@@ -17,7 +17,7 @@ interface BranchWithAvailability extends GitBranch {
   takenBySession: string | null;
 }
 
-export function SessionBranchSelector({ realmId, onBranchSelected, onSkip }: SessionBranchSelectorProps) {
+export function SessionBranchSelector({ projectId, onBranchSelected, onSkip }: SessionBranchSelectorProps) {
   const [tab, setTab] = useState<Tab>("existing");
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([]);
@@ -43,8 +43,8 @@ export function SessionBranchSelector({ realmId, onBranchSelected, onSkip }: Ses
     setError(null);
     try {
       const [branchList, worktreeList] = await Promise.all([
-        gitListBranchesForRealm(realmId),
-        listWorktrees(realmId),
+        gitListBranchesForProject(projectId),
+        listWorktrees(projectId),
       ]);
       setBranches(branchList);
       setWorktrees(worktreeList);
@@ -58,7 +58,7 @@ export function SessionBranchSelector({ realmId, onBranchSelected, onSkip }: Ses
     } finally {
       setLoading(false);
     }
-  }, [realmId]);
+  }, [projectId]);
 
   useEffect(() => {
     loadData();
@@ -137,7 +137,7 @@ export function SessionBranchSelector({ realmId, onBranchSelected, onSkip }: Ses
     // Check availability via backend
     setCheckingAvailability(true);
     const timer = setTimeout(() => {
-      checkBranchAvailable(realmId, newBranchName)
+      checkBranchAvailable(projectId, newBranchName)
         .then((result) => {
           if (!result.available) {
             setValidationError(
@@ -156,7 +156,7 @@ export function SessionBranchSelector({ realmId, onBranchSelected, onSkip }: Ses
         .finally(() => setCheckingAvailability(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [newBranchName, realmId, localBranchNames]);
+  }, [newBranchName, projectId, localBranchNames]);
 
   const handleSelectBranch = useCallback(
     (branchName: string) => {

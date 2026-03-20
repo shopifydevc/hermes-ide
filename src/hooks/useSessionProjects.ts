@@ -25,14 +25,14 @@ export function useSessionProjects(sessionId: string | null) {
     let unlisten: (() => void) | null = null;
     let unlistenGlobal: (() => void) | null = null;
 
-    listen<Project[]>(`session-realms-updated-${sessionId}`, (event) => {
+    listen<Project[]>(`session-projects-updated-${sessionId}`, (event) => {
       if (!cancelled) setProjects(event.payload);
     }).then((u) => {
       if (cancelled) { u(); } else { unlisten = u; }
     });
 
     // Listen for global project updates (scan completions)
-    listen<Project>("realm-updated", () => {
+    listen<Project>("project-updated", () => {
       if (cancelled) return;
       // Refetch to get updated data
       getSessionProjects(sessionId)

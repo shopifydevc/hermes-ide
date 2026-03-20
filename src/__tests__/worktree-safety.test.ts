@@ -64,8 +64,8 @@ function statusClass(status: string): string {
  * Mirrors DirtyWorktreeDialog rendering logic (tested without DOM).
  */
 interface DirtyWorktreeChange {
-  realmId: string;
-  realmName: string;
+  projectId: string;
+  projectName: string;
   branchName: string | null;
   files: Array<{ path: string; status: string }>;
 }
@@ -80,8 +80,8 @@ function getDirtyDialogOutput(props: {
   const message = `Session ${sessionLabel} has ${totalFiles} uncommitted ${totalFiles === 1 ? "change" : "changes"} across ${changes.length} ${changes.length === 1 ? "project" : "projects"}.`;
 
   const projects = changes.map((change) => ({
-    realmId: change.realmId,
-    realmName: change.realmName,
+    projectId: change.projectId,
+    projectName: change.projectName,
     branchName: change.branchName,
     files: change.files.map((file) => ({
       path: file.path,
@@ -139,14 +139,14 @@ beforeEach(() => {
 // =====================================================================
 
 describe("API bindings - worktreeHasChanges", () => {
-  it("invokes correct IPC command with sessionId and realmId", async () => {
+  it("invokes correct IPC command with sessionId and projectId", async () => {
     vi.mocked(invoke).mockResolvedValue({ has_changes: true, files: [{ path: "src/main.ts", status: "M" }] });
 
-    const result = await worktreeHasChanges("session-1", "realm-1");
+    const result = await worktreeHasChanges("session-1", "project-1");
 
     expect(invoke).toHaveBeenCalledWith("git_worktree_has_changes", {
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
     });
     expect(result).toEqual({
       has_changes: true,
@@ -157,11 +157,11 @@ describe("API bindings - worktreeHasChanges", () => {
   it("returns no changes when worktree is clean", async () => {
     vi.mocked(invoke).mockResolvedValue({ has_changes: false, files: [] });
 
-    const result = await worktreeHasChanges("session-2", "realm-2");
+    const result = await worktreeHasChanges("session-2", "project-2");
 
     expect(invoke).toHaveBeenCalledWith("git_worktree_has_changes", {
       sessionId: "session-2",
-      realmId: "realm-2",
+      projectId: "project-2",
     });
     expect(result.has_changes).toBe(false);
     expect(result.files).toHaveLength(0);
@@ -172,11 +172,11 @@ describe("API bindings - stashWorktree", () => {
   it("invokes correct IPC command with all parameters", async () => {
     vi.mocked(invoke).mockResolvedValue({ success: true });
 
-    await stashWorktree("session-1", "realm-1", "my stash message");
+    await stashWorktree("session-1", "project-1", "my stash message");
 
     expect(invoke).toHaveBeenCalledWith("git_stash_worktree", {
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
       message: "my stash message",
     });
   });
@@ -184,11 +184,11 @@ describe("API bindings - stashWorktree", () => {
   it("passes null for undefined message", async () => {
     vi.mocked(invoke).mockResolvedValue({ success: true });
 
-    await stashWorktree("session-1", "realm-1");
+    await stashWorktree("session-1", "project-1");
 
     expect(invoke).toHaveBeenCalledWith("git_stash_worktree", {
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
       message: null,
     });
   });
@@ -196,11 +196,11 @@ describe("API bindings - stashWorktree", () => {
   it("passes null for explicitly undefined message", async () => {
     vi.mocked(invoke).mockResolvedValue({ success: true });
 
-    await stashWorktree("session-1", "realm-1", undefined);
+    await stashWorktree("session-1", "project-1", undefined);
 
     expect(invoke).toHaveBeenCalledWith("git_stash_worktree", {
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
       message: null,
     });
   });
@@ -337,8 +337,8 @@ describe("Branch mismatch detection", () => {
 describe("DirtyWorktreeDialog behavior", () => {
   const singleChange: DirtyWorktreeChange[] = [
     {
-      realmId: "realm-1",
-      realmName: "my-project",
+      projectId: "project-1",
+      projectName: "my-project",
       branchName: "feature/login",
       files: [
         { path: "src/main.ts", status: "MODIFIED" },
@@ -374,8 +374,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Session 1",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: "main",
         files: [
           { path: "a.ts", status: "modified" },
@@ -395,8 +395,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Test",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: null,
         files: [
           { path: "a.ts", status: "M" },
@@ -416,8 +416,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Test",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: null,
         files: [
           { path: "a.ts", status: "UNTRACKED" },
@@ -450,8 +450,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Session 1",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: null,
         files: [{ path: "file.ts", status: "M" }],
       }],
@@ -482,8 +482,8 @@ describe("DirtyWorktreeDialog behavior", () => {
   it("shows multiple projects when multiple dirty worktrees exist", () => {
     const multipleChanges: DirtyWorktreeChange[] = [
       {
-        realmId: "realm-1",
-        realmName: "frontend",
+        projectId: "project-1",
+        projectName: "frontend",
         branchName: "feature/ui",
         files: [
           { path: "src/App.tsx", status: "M" },
@@ -491,16 +491,16 @@ describe("DirtyWorktreeDialog behavior", () => {
         ],
       },
       {
-        realmId: "realm-2",
-        realmName: "backend",
+        projectId: "project-2",
+        projectName: "backend",
         branchName: "feature/api",
         files: [
           { path: "src/server.ts", status: "A" },
         ],
       },
       {
-        realmId: "realm-3",
-        realmName: "shared",
+        projectId: "project-3",
+        projectName: "shared",
         branchName: "develop",
         files: [
           { path: "types.ts", status: "D" },
@@ -520,15 +520,15 @@ describe("DirtyWorktreeDialog behavior", () => {
     expect(output.message).toContain("6 uncommitted changes");
     expect(output.message).toContain("3 projects");
 
-    expect(output.projects[0].realmName).toBe("frontend");
+    expect(output.projects[0].projectName).toBe("frontend");
     expect(output.projects[0].branchName).toBe("feature/ui");
     expect(output.projects[0].files).toHaveLength(2);
 
-    expect(output.projects[1].realmName).toBe("backend");
+    expect(output.projects[1].projectName).toBe("backend");
     expect(output.projects[1].branchName).toBe("feature/api");
     expect(output.projects[1].files).toHaveLength(1);
 
-    expect(output.projects[2].realmName).toBe("shared");
+    expect(output.projects[2].projectName).toBe("shared");
     expect(output.projects[2].branchName).toBe("develop");
     expect(output.projects[2].files).toHaveLength(3);
   });
@@ -564,8 +564,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Session X",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: "main",
         files: [{ path: "file.ts", status: "M" }],
       }],
@@ -579,8 +579,8 @@ describe("DirtyWorktreeDialog behavior", () => {
     const output = getDirtyDialogOutput({
       sessionLabel: "Session X",
       changes: [{
-        realmId: "r1",
-        realmName: "proj",
+        projectId: "r1",
+        projectName: "proj",
         branchName: "main",
         files: [
           { path: "a.ts", status: "M" },
@@ -608,7 +608,7 @@ describe("Dirty close flow logic", () => {
    */
   async function simulateCloseFlow(opts: {
     getProjects: () => Promise<Array<{ id: string; name: string }>>;
-    checkDirty: (sessionId: string, realmId: string) => Promise<{ has_changes: boolean; files: Array<{ path: string; status: string }> }>;
+    checkDirty: (sessionId: string, projectId: string) => Promise<{ has_changes: boolean; files: Array<{ path: string; status: string }> }>;
     sessionId: string;
   }): Promise<{ action: "dialog" | "close" | "close-error"; changes?: DirtyWorktreeChange[] }> {
     try {
@@ -620,8 +620,8 @@ describe("Dirty close flow logic", () => {
           const changes = await opts.checkDirty(opts.sessionId, project.id);
           if (changes.has_changes) {
             dirtyChanges.push({
-              realmId: project.id,
-              realmName: project.name,
+              projectId: project.id,
+              projectName: project.name,
               branchName: null,
               files: changes.files,
             });
@@ -644,8 +644,8 @@ describe("Dirty close flow logic", () => {
   it("with no dirty changes, close proceeds without dialog", async () => {
     const result = await simulateCloseFlow({
       getProjects: async () => [
-        { id: "realm-1", name: "project-1" },
-        { id: "realm-2", name: "project-2" },
+        { id: "project-1", name: "project-1" },
+        { id: "project-2", name: "project-2" },
       ],
       checkDirty: async () => ({ has_changes: false, files: [] }),
       sessionId: "session-1",
@@ -658,11 +658,11 @@ describe("Dirty close flow logic", () => {
   it("with dirty changes in one project, dialog should be triggered", async () => {
     const result = await simulateCloseFlow({
       getProjects: async () => [
-        { id: "realm-1", name: "project-1" },
-        { id: "realm-2", name: "project-2" },
+        { id: "project-1", name: "project-1" },
+        { id: "project-2", name: "project-2" },
       ],
-      checkDirty: async (_sid, realmId) => {
-        if (realmId === "realm-1") {
+      checkDirty: async (_sid, projectId) => {
+        if (projectId === "project-1") {
           return {
             has_changes: true,
             files: [{ path: "src/main.ts", status: "M" }],
@@ -675,23 +675,23 @@ describe("Dirty close flow logic", () => {
 
     expect(result.action).toBe("dialog");
     expect(result.changes).toHaveLength(1);
-    expect(result.changes![0].realmId).toBe("realm-1");
-    expect(result.changes![0].realmName).toBe("project-1");
+    expect(result.changes![0].projectId).toBe("project-1");
+    expect(result.changes![0].projectName).toBe("project-1");
     expect(result.changes![0].files).toHaveLength(1);
   });
 
   it("with dirty changes in multiple projects, all are collected", async () => {
     const result = await simulateCloseFlow({
       getProjects: async () => [
-        { id: "realm-1", name: "frontend" },
-        { id: "realm-2", name: "backend" },
-        { id: "realm-3", name: "shared" },
+        { id: "project-1", name: "frontend" },
+        { id: "project-2", name: "backend" },
+        { id: "project-3", name: "shared" },
       ],
-      checkDirty: async (_sid, realmId) => {
-        if (realmId === "realm-1") {
+      checkDirty: async (_sid, projectId) => {
+        if (projectId === "project-1") {
           return { has_changes: true, files: [{ path: "app.tsx", status: "M" }] };
         }
-        if (realmId === "realm-3") {
+        if (projectId === "project-3") {
           return { has_changes: true, files: [{ path: "types.ts", status: "D" }] };
         }
         return { has_changes: false, files: [] };
@@ -701,15 +701,15 @@ describe("Dirty close flow logic", () => {
 
     expect(result.action).toBe("dialog");
     expect(result.changes).toHaveLength(2);
-    expect(result.changes!.map((c) => c.realmId)).toEqual(["realm-1", "realm-3"]);
+    expect(result.changes!.map((c) => c.projectId)).toEqual(["project-1", "project-3"]);
   });
 
   it("stash and close calls stashWorktree for each dirty project", async () => {
-    const stashCalls: Array<{ sessionId: string; realmId: string; message: string }> = [];
+    const stashCalls: Array<{ sessionId: string; projectId: string; message: string }> = [];
 
     const dirtyChanges: DirtyWorktreeChange[] = [
-      { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-      { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+      { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+      { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
     ];
 
     // Simulate the handleDirtyStashAndClose logic
@@ -717,7 +717,7 @@ describe("Dirty close flow logic", () => {
     for (const change of dirtyChanges) {
       stashCalls.push({
         sessionId,
-        realmId: change.realmId,
+        projectId: change.projectId,
         message: "Auto-stash before closing session",
       });
     }
@@ -725,12 +725,12 @@ describe("Dirty close flow logic", () => {
     expect(stashCalls).toHaveLength(2);
     expect(stashCalls[0]).toEqual({
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
       message: "Auto-stash before closing session",
     });
     expect(stashCalls[1]).toEqual({
       sessionId: "session-1",
-      realmId: "realm-2",
+      projectId: "project-2",
       message: "Auto-stash before closing session",
     });
   });
@@ -764,11 +764,11 @@ describe("Dirty close flow logic", () => {
   it("individual project dirty check failure is non-fatal", async () => {
     const result = await simulateCloseFlow({
       getProjects: async () => [
-        { id: "realm-1", name: "project-1" },
-        { id: "realm-2", name: "project-2" },
+        { id: "project-1", name: "project-1" },
+        { id: "project-2", name: "project-2" },
       ],
-      checkDirty: async (_sid, realmId) => {
-        if (realmId === "realm-1") {
+      checkDirty: async (_sid, projectId) => {
+        if (projectId === "project-1") {
           throw new Error("Project check failed");
         }
         return {
@@ -779,24 +779,24 @@ describe("Dirty close flow logic", () => {
       sessionId: "session-1",
     });
 
-    // realm-1 failed but realm-2 succeeded with dirty changes
+    // project-1 failed but project-2 succeeded with dirty changes
     expect(result.action).toBe("dialog");
     expect(result.changes).toHaveLength(1);
-    expect(result.changes![0].realmId).toBe("realm-2");
+    expect(result.changes![0].projectId).toBe("project-2");
   });
 
   it("stash failure for one project does not prevent closing", async () => {
-    const stashResults: Array<{ realmId: string; success: boolean }> = [];
+    const stashResults: Array<{ projectId: string; success: boolean }> = [];
 
     const dirtyChanges: DirtyWorktreeChange[] = [
-      { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-      { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+      { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+      { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
     ];
 
     // Simulate the handleDirtyStashAndClose logic with failure handling
     const sessionId = "session-1";
-    const mockStash = async (sid: string, realmId: string) => {
-      if (realmId === "realm-1") {
+    const mockStash = async (sid: string, projectId: string) => {
+      if (projectId === "project-1") {
         throw new Error("Stash failed");
       }
       return { success: true };
@@ -804,18 +804,18 @@ describe("Dirty close flow logic", () => {
 
     for (const change of dirtyChanges) {
       try {
-        await mockStash(sessionId, change.realmId);
-        stashResults.push({ realmId: change.realmId, success: true });
+        await mockStash(sessionId, change.projectId);
+        stashResults.push({ projectId: change.projectId, success: true });
       } catch {
         // Mirror SessionContext: warn but continue
-        stashResults.push({ realmId: change.realmId, success: false });
+        stashResults.push({ projectId: change.projectId, success: false });
       }
     }
 
     // Both should have been attempted
     expect(stashResults).toHaveLength(2);
-    expect(stashResults[0]).toEqual({ realmId: "realm-1", success: false });
-    expect(stashResults[1]).toEqual({ realmId: "realm-2", success: true });
+    expect(stashResults[0]).toEqual({ projectId: "project-1", success: false });
+    expect(stashResults[1]).toEqual({ projectId: "project-2", success: true });
   });
 
   it("no projects means close proceeds directly", async () => {
@@ -847,22 +847,22 @@ describe("Stash failure handling", () => {
       sessionId: string;
       changes: DirtyWorktreeChange[];
     } | null;
-    stashFn: (sessionId: string, realmId: string, message: string) => Promise<void>;
+    stashFn: (sessionId: string, projectId: string, message: string) => Promise<void>;
   }): Promise<{
     action: "closed" | "errors" | "noop";
-    failures?: Array<{ realmName: string; error: string }>;
+    failures?: Array<{ projectName: string; error: string }>;
   }> {
     if (!opts.pendingDirtyClose) return { action: "noop" };
 
     const { sessionId, changes } = opts.pendingDirtyClose;
-    const failures: Array<{ realmName: string; error: string }> = [];
+    const failures: Array<{ projectName: string; error: string }> = [];
 
     for (const change of changes) {
       try {
-        await opts.stashFn(sessionId, change.realmId, "Auto-stash before closing session");
+        await opts.stashFn(sessionId, change.projectId, "Auto-stash before closing session");
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
-        failures.push({ realmName: change.realmName, error: message });
+        failures.push({ projectName: change.projectName, error: message });
       }
     }
 
@@ -880,7 +880,7 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
         ],
       },
       stashFn: async () => {
@@ -891,7 +891,7 @@ describe("Stash failure handling", () => {
     // Close should be blocked
     expect(result.action).toBe("errors");
     expect(result.failures).toHaveLength(1);
-    expect(result.failures![0].realmName).toBe("frontend");
+    expect(result.failures![0].projectName).toBe("frontend");
     expect(result.failures![0].error).toContain("merge conflict");
   });
 
@@ -900,22 +900,22 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-          { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
         ],
       },
-      stashFn: async (_sid, realmId) => {
-        if (realmId === "realm-1") {
+      stashFn: async (_sid, projectId) => {
+        if (projectId === "project-1") {
           throw new Error("Permission denied");
         }
-        // realm-2 succeeds
+        // project-2 succeeds
       },
     });
 
     // Close is blocked because at least one stash failed
     expect(result.action).toBe("errors");
     expect(result.failures).toHaveLength(1);
-    expect(result.failures![0].realmName).toBe("frontend");
+    expect(result.failures![0].projectName).toBe("frontend");
     expect(result.failures![0].error).toBe("Permission denied");
 
     // The dialog would show "Try Again" button (verified by component structure).
@@ -924,8 +924,8 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-          { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
         ],
       },
       stashFn: async () => {
@@ -943,7 +943,7 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
         ],
       },
       stashFn: async () => {
@@ -970,9 +970,9 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-          { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
-          { realmId: "realm-3", realmName: "shared", branchName: "feat", files: [{ path: "c.ts", status: "D" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+          { projectId: "project-3", projectName: "shared", branchName: "feat", files: [{ path: "c.ts", status: "D" }] },
         ],
       },
       stashFn: async () => {
@@ -989,22 +989,22 @@ describe("Stash failure handling", () => {
       pendingDirtyClose: {
         sessionId: "session-1",
         changes: [
-          { realmId: "realm-1", realmName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
-          { realmId: "realm-2", realmName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
-          { realmId: "realm-3", realmName: "shared", branchName: "feat", files: [{ path: "c.ts", status: "D" }] },
+          { projectId: "project-1", projectName: "frontend", branchName: "feat", files: [{ path: "a.ts", status: "M" }] },
+          { projectId: "project-2", projectName: "backend", branchName: "feat", files: [{ path: "b.ts", status: "A" }] },
+          { projectId: "project-3", projectName: "shared", branchName: "feat", files: [{ path: "c.ts", status: "D" }] },
         ],
       },
-      stashFn: async (_sid, realmId) => {
-        if (realmId === "realm-1") throw new Error("Error 1");
-        if (realmId === "realm-3") throw new Error("Error 3");
-        // realm-2 succeeds
+      stashFn: async (_sid, projectId) => {
+        if (projectId === "project-1") throw new Error("Error 1");
+        if (projectId === "project-3") throw new Error("Error 3");
+        // project-2 succeeds
       },
     });
 
     expect(result.action).toBe("errors");
     expect(result.failures).toHaveLength(2);
-    expect(result.failures![0]).toEqual({ realmName: "frontend", error: "Error 1" });
-    expect(result.failures![1]).toEqual({ realmName: "shared", error: "Error 3" });
+    expect(result.failures![0]).toEqual({ projectName: "frontend", error: "Error 1" });
+    expect(result.failures![1]).toEqual({ projectName: "shared", error: "Error 3" });
   });
 
   it("noop when no pending dirty close", async () => {

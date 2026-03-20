@@ -136,39 +136,39 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
 
   // Branch selection state — per-project
   type BranchSelection = { branch: string; createNew: boolean };
-  const [gitRealmIds, setGitRealmIds] = useState<string[]>([]);
+  const [gitProjectIds, setGitProjectIds] = useState<string[]>([]);
   const [checkingGit, setCheckingGit] = useState(false);
   const [branchSelections, setBranchSelections] = useState<Record<string, BranchSelection>>({});
-  const [expandedRealmId, setExpandedRealmId] = useState<string | null>(null);
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
 
   // Auto-expand first git project only when first entering the branch step
   const prevStepRef = useRef(step);
   useEffect(() => {
-    if (step === "branch" && prevStepRef.current !== "branch" && gitRealmIds.length > 0) {
-      const firstGit = selectedProjectIds.find((id) => gitRealmIds.includes(id));
-      if (firstGit) setExpandedRealmId(firstGit);
+    if (step === "branch" && prevStepRef.current !== "branch" && gitProjectIds.length > 0) {
+      const firstGit = selectedProjectIds.find((id) => gitProjectIds.includes(id));
+      if (firstGit) setExpandedProjectId(firstGit);
     }
     prevStepRef.current = step;
-  }, [step, gitRealmIds, selectedProjectIds]);
+  }, [step, gitProjectIds, selectedProjectIds]);
 
   // Auto-advance to the next unselected git project when branchSelections changes
   useEffect(() => {
     if (step !== 'branch') return;
     const nextUnselected = selectedProjectIds.find(
-      (id) => gitRealmIds.includes(id) && !branchSelections[id]
+      (id) => gitProjectIds.includes(id) && !branchSelections[id]
     );
     if (nextUnselected) {
-      setExpandedRealmId(nextUnselected);
+      setExpandedProjectId(nextUnselected);
     } else if (Object.keys(branchSelections).length > 0 && selectedProjectIds.every(
-      (id) => !gitRealmIds.includes(id) || branchSelections[id]
+      (id) => !gitProjectIds.includes(id) || branchSelections[id]
     )) {
       // All git projects have selections — collapse
-      setExpandedRealmId(null);
+      setExpandedProjectId(null);
     }
-  }, [branchSelections, step, selectedProjectIds, gitRealmIds]);
+  }, [branchSelections, step, selectedProjectIds, gitProjectIds]);
 
   // Determine whether to show the branch step
-  const showBranchStep = gitRealmIds.length > 0 && selectedProjectIds.length > 0;
+  const showBranchStep = gitProjectIds.length > 0 && selectedProjectIds.length > 0;
 
   // Existing project groups (from current sessions) with their colors
   const [existingGroups, setExistingGroups] = useState<string[]>([]);
@@ -309,23 +309,23 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
   // Check which selected projects are git repos when selection changes
   useEffect(() => {
     if (selectedProjectIds.length === 0) {
-      setGitRealmIds([]);
+      setGitProjectIds([]);
       setBranchSelections({});
       return;
     }
     let cancelled = false;
     setCheckingGit(true);
     Promise.all(
-      selectedProjectIds.map((realmId) =>
-        checkIsGitRepo(realmId)
-          .then((isGit) => ({ realmId, isGit }))
-          .catch(() => ({ realmId, isGit: false }))
+      selectedProjectIds.map((projectId) =>
+        checkIsGitRepo(projectId)
+          .then((isGit) => ({ projectId, isGit }))
+          .catch(() => ({ projectId, isGit: false }))
       )
     )
       .then((results) => {
         if (cancelled) return;
-        const gitIds = results.filter((r) => r.isGit).map((r) => r.realmId);
-        setGitRealmIds(gitIds);
+        const gitIds = results.filter((r) => r.isGit).map((r) => r.projectId);
+        setGitProjectIds(gitIds);
         // Remove branch selections for projects no longer selected or no longer git repos
         setBranchSelections((prev) => {
           const next: Record<string, BranchSelection> = {};
@@ -831,20 +831,20 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
         )}
 
         {/* Step 2 (conditional): Select Branch — per-project */}
-        {step === "branch" && gitRealmIds.length > 0 && (
+        {step === "branch" && gitProjectIds.length > 0 && (
           <div className="session-creator-body">
             <div className="session-creator-section-title">Select Branches</div>
             <div className="session-creator-branch-multi">
-              {selectedProjectIds.map((realmId) => {
-                const isGit = gitRealmIds.includes(realmId);
-                const realmName = allProjects.find((r) => r.id === realmId)?.name || realmId;
-                const isExpanded = expandedRealmId === realmId;
+              {selectedProjectIds.map((projectId) => {
+                const isGit = gitProjectIds.includes(projectId);
+                const projectName = allProjects.find((r) => r.id === projectId)?.name || projectId;
+                const isExpanded = expandedProjectId === projectId;
 
                 if (!isGit) {
                   return (
-                    <div key={realmId} className="session-creator-branch-realm">
-                      <div className="session-creator-branch-realm-header">
-                        <span className="session-creator-branch-realm-name">{realmName}</span>
+                    <div key={projectId} className="session-creator-branch-project">
+                      <div className="session-creator-branch-project-header">
+                        <span className="session-creator-branch-project-name">{projectName}</span>
                         <span className="session-creator-branch-nonGit">Not a git repository</span>
                       </div>
                     </div>
@@ -852,34 +852,34 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
                 }
 
                 return (
-                  <div key={realmId} className={`session-creator-branch-realm ${isExpanded ? "expanded" : ""}`}>
+                  <div key={projectId} className={`session-creator-branch-project ${isExpanded ? "expanded" : ""}`}>
                     <div
-                      className="session-creator-branch-realm-header"
-                      onClick={() => setExpandedRealmId(isExpanded ? null : realmId)}
+                      className="session-creator-branch-project-header"
+                      onClick={() => setExpandedProjectId(isExpanded ? null : projectId)}
                       style={{ cursor: "pointer" }}
                     >
-                      <span className="session-creator-branch-realm-chevron">{isExpanded ? "\u25BC" : "\u25B6"}</span>
-                      <span className="session-creator-branch-realm-name">{realmName}</span>
-                      {branchSelections[realmId] && (
+                      <span className="session-creator-branch-project-chevron">{isExpanded ? "\u25BC" : "\u25B6"}</span>
+                      <span className="session-creator-branch-project-name">{projectName}</span>
+                      {branchSelections[projectId] && (
                         <span className="session-creator-branch-selected-label">
-                          {branchSelections[realmId].branch}
-                          {branchSelections[realmId].createNew ? " (new)" : ""}
+                          {branchSelections[projectId].branch}
+                          {branchSelections[projectId].createNew ? " (new)" : ""}
                         </span>
                       )}
                     </div>
                     {isExpanded && (
                       <SessionBranchSelector
-                        realmId={realmId}
+                        projectId={projectId}
                         onBranchSelected={(name, isNew) => {
                           setBranchSelections((prev) => ({
                             ...prev,
-                            [realmId]: { branch: name, createNew: isNew },
+                            [projectId]: { branch: name, createNew: isNew },
                           }));
                         }}
                         onSkip={() => {
                           setBranchSelections((prev) => {
                             const next = { ...prev };
-                            delete next[realmId];
+                            delete next[projectId];
                             return next;
                           });
                         }}
@@ -1118,10 +1118,10 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
                     <div className="session-creator-summary-row">
                       <span className="session-creator-summary-label">{Object.keys(branchSelections).length === 1 ? "Branch:" : "Branches:"}</span>
                       <span className="session-creator-summary-value">
-                        {Object.entries(branchSelections).map(([realmId, sel], idx) => {
-                          const name = allProjects.find((r) => r.id === realmId)?.name || realmId;
+                        {Object.entries(branchSelections).map(([projectId, sel], idx) => {
+                          const name = allProjects.find((r) => r.id === projectId)?.name || projectId;
                           return (
-                            <span key={realmId}>
+                            <span key={projectId}>
                               {idx > 0 && ", "}
                               {Object.keys(branchSelections).length > 1 ? `${name}: ` : ""}
                               {sel.branch}{sel.createNew ? " (new)" : ""}

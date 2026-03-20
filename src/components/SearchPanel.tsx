@@ -51,7 +51,7 @@ export function SearchPanel({ visible }: SearchPanelProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set());
-  const [realmId, setRealmId] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [width, setWidth] = useState(320);
   const resizing = useRef(false);
@@ -71,21 +71,21 @@ export function SearchPanel({ visible }: SearchPanelProps) {
 
   const sessionId = state.activeSessionId;
 
-  // Load primary project (realm) for active session
+  // Load primary project for active session
   useEffect(() => {
     if (!sessionId) {
-      setRealmId(null);
+      setProjectId(null);
       return;
     }
     getSessionProjects(sessionId)
       .then((projects) => {
         if (projects.length > 0) {
-          setRealmId(projects[0].id);
+          setProjectId(projects[0].id);
         } else {
-          setRealmId(null);
+          setProjectId(null);
         }
       })
-      .catch(() => setRealmId(null));
+      .catch(() => setProjectId(null));
   }, [sessionId]);
 
   // Auto-focus input on mount
@@ -102,7 +102,7 @@ export function SearchPanel({ visible }: SearchPanelProps) {
   useEffect(() => {
     let cancelled = false;
 
-    if (!sessionId || !realmId) {
+    if (!sessionId || !projectId) {
       setResults(null);
       setError(null);
       setLoading(false);
@@ -120,7 +120,7 @@ export function SearchPanel({ visible }: SearchPanelProps) {
     setResults(null); // Clear stale results from previous query immediately
 
     const timer = setTimeout(() => {
-      searchProject(sessionId, realmId, query, isRegex, caseSensitive)
+      searchProject(sessionId, projectId, query, isRegex, caseSensitive)
         .then((res) => {
           if (cancelled) return;
           setResults(res);
@@ -137,7 +137,7 @@ export function SearchPanel({ visible }: SearchPanelProps) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query, isRegex, caseSensitive, sessionId, realmId]);
+  }, [query, isRegex, caseSensitive, sessionId, projectId]);
 
   // Resize handle
   const onResizeStart = useCallback((e: React.MouseEvent) => {
@@ -208,24 +208,24 @@ export function SearchPanel({ visible }: SearchPanelProps) {
       </div>
 
       {/* Summary */}
-      {(!sessionId || !realmId) && (
+      {(!sessionId || !projectId) && (
         <div className="search-no-session">Open a session to search</div>
       )}
-      {sessionId && realmId && loading && (
+      {sessionId && projectId && loading && (
         <div className="search-summary">Searching…</div>
       )}
-      {sessionId && realmId && !loading && error && (
+      {sessionId && projectId && !loading && error && (
         <div className="search-error">{error}</div>
       )}
-      {sessionId && realmId && !loading && !error && results && (
+      {sessionId && projectId && !loading && !error && results && (
         <div className="search-summary">
           {formatResultCount(results.total_matches, results.results.length)}
         </div>
       )}
-      {sessionId && realmId && !loading && !error && results && results.truncated && (
+      {sessionId && projectId && !loading && !error && results && results.truncated && (
         <div className="search-truncated">Results capped at 500. Narrow your search.</div>
       )}
-      {sessionId && realmId && !loading && !error && query.length >= 2 && results && results.total_matches === 0 && (
+      {sessionId && projectId && !loading && !error && query.length >= 2 && results && results.total_matches === 0 && (
         <div className="search-empty">No results found</div>
       )}
 

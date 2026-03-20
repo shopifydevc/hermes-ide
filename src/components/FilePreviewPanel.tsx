@@ -10,7 +10,7 @@ import type { FileHandlerProps } from "../plugins/types";
 
 interface FilePreviewPanelProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
   filePath: string;
   onBack: () => void;
   fileHandler?: React.ComponentType<FileHandlerProps>;
@@ -156,9 +156,9 @@ function utf8ToBase64(str: string): string {
 
 const MAX_DISPLAY_SIZE = 1_048_576;
 
-export function FilePreviewPanel({ sessionId, realmId, filePath, onBack, fileHandler: FileHandler, fileHandlerPluginId }: FilePreviewPanelProps) {
+export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileHandler: FileHandler, fileHandlerPluginId }: FilePreviewPanelProps) {
   const { state } = useSession();
-  const isSSH = realmId === "__ssh__";
+  const isSSH = projectId === "__ssh__";
   const sshInfo = isSSH ? state.sessions[sessionId]?.ssh_info : null;
   const [file, setFile] = useState<FileContent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -170,12 +170,12 @@ export function FilePreviewPanel({ sessionId, realmId, filePath, onBack, fileHan
     setError(null);
     const promise = isSSH
       ? sshReadFile(sessionId, filePath)
-      : readFileContent(sessionId, realmId, filePath);
+      : readFileContent(sessionId, projectId, filePath);
     promise
       .then(setFile)
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
-  }, [sessionId, realmId, filePath, isSSH]);
+  }, [sessionId, projectId, filePath, isSSH]);
 
   useEffect(() => {
     const key = isSSH ? "preferred_ssh_editor" : "preferred_editor";
@@ -219,10 +219,10 @@ export function FilePreviewPanel({ sessionId, realmId, filePath, onBack, fileHan
         .catch(console.error);
     } else {
       getSetting("preferred_editor")
-        .then((editor) => openFileInEditor(sessionId, realmId, filePath, editor || null))
+        .then((editor) => openFileInEditor(sessionId, projectId, filePath, editor || null))
         .catch(console.error);
     }
-  }, [sessionId, realmId, filePath, isSSH, sshInfo, onBack]);
+  }, [sessionId, projectId, filePath, isSSH, sshInfo, onBack]);
 
   const lines = useMemo(() => {
     if (!file || !file.content) return [];

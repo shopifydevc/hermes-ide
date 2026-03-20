@@ -97,7 +97,7 @@ function makeBaseContext(overrides?: Partial<ContextState>): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "/home/user/project",
     agent: "anthropic",
@@ -672,8 +672,8 @@ describe("Regression: formatContextMarkdown still works correctly", () => {
         kind: "file", target: "/src/main.ts", label: "Main entry",
         priority: 128, created_at: 1000,
       }],
-      realms: [{
-        realm_id: "r1", realm_name: "my-project", path: "/home/user/my-project",
+      projects: [{
+        project_id: "r1", project_name: "my-project", path: "/home/user/my-project",
         languages: ["TypeScript"], frameworks: ["React"],
         architecture_pattern: "MVC", architecture_layers: [],
         conventions: ["Use camelCase"], scan_status: "deep",

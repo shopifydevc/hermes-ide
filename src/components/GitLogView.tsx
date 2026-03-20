@@ -9,7 +9,7 @@ import "../styles/components/GitPanel.css";
 
 interface GitLogViewProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
 }
 
 // ─── Pure helpers (exported for testing) ─────────────────────────────
@@ -82,7 +82,7 @@ const PAGE_SIZE = 50;
 
 // ─── Component ───────────────────────────────────────────────────────
 
-export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
+export function GitLogView({ sessionId, projectId }: GitLogViewProps) {
   const [entries, setEntries] = useState<GitLogEntry[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -94,8 +94,8 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const fetchingRef = useRef(false);
-  // Track the current realmId so stale fetches from a previous realm are discarded
-  const realmIdRef = useRef(realmId);
+  // Track the current projectId so stale fetches from a previous project are discarded
+  const projectIdRef = useRef(projectId);
 
   const contextCommitRef = useRef<GitLogEntry | null>(null);
 
@@ -117,9 +117,9 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
 
   const { showMenu: showCommitMenu } = useContextMenu(handleCommitAction);
 
-  // Reset when sessionId or realmId changes
+  // Reset when sessionId or projectId changes
   useEffect(() => {
-    realmIdRef.current = realmId;
+    projectIdRef.current = projectId;
     setEntries([]);
     setHasMore(true);
     setLoading(false);
@@ -128,7 +128,7 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
     setSelectedHash(null);
     offsetRef.current = 0;
     fetchingRef.current = false;
-  }, [sessionId, realmId]);
+  }, [sessionId, projectId]);
 
   const fetchPage = useCallback(() => {
     if (fetchingRef.current || !hasMore) return;
@@ -136,11 +136,11 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
     setLoading(true);
     setError(null);
 
-    const fetchRealm = realmId;
-    gitLog(sessionId, realmId, PAGE_SIZE, offsetRef.current)
+    const fetchProjectId = projectId;
+    gitLog(sessionId, projectId, PAGE_SIZE, offsetRef.current)
       .then((result: GitLogResult) => {
-        // Discard result if realmId changed while fetching
-        if (realmIdRef.current !== fetchRealm) {
+        // Discard result if projectId changed while fetching
+        if (projectIdRef.current !== fetchProjectId) {
           fetchingRef.current = false;
           return;
         }
@@ -152,7 +152,7 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
         fetchingRef.current = false;
       })
       .catch((e) => {
-        if (realmIdRef.current !== fetchRealm) {
+        if (projectIdRef.current !== fetchProjectId) {
           fetchingRef.current = false;
           return;
         }
@@ -161,12 +161,12 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
         setLoading(false);
         fetchingRef.current = false;
       });
-  }, [sessionId, realmId, hasMore]);
+  }, [sessionId, projectId, hasMore]);
 
   // Fetch initial page
   useEffect(() => {
     fetchPage();
-  }, [sessionId, realmId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // IntersectionObserver for lazy loading
   useEffect(() => {
@@ -286,7 +286,7 @@ export function GitLogView({ sessionId, realmId }: GitLogViewProps) {
       {selectedHash && (
         <GitCommitDetailView
           sessionId={sessionId}
-          realmId={realmId}
+          projectId={projectId}
           commitHash={selectedHash}
           onClose={() => setSelectedHash(null)}
         />

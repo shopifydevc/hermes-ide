@@ -105,9 +105,9 @@ pub struct ApplyContextResult {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RealmContext {
-    pub realm_id: String,
-    pub realm_name: String,
+pub struct ProjectContext {
+    pub project_id: String,
+    pub project_name: String,
     pub path: String,
     pub languages: Vec<String>,
     pub frameworks: Vec<String>,
@@ -153,7 +153,7 @@ pub struct ErrorContext {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionContext {
-    pub realms: Vec<RealmContext>,
+    pub projects: Vec<ProjectContext>,
     pub pins: Vec<PinContext>,
     pub memory: Vec<MemoryContext>,
     pub error_resolutions: Vec<ErrorContext>,
@@ -165,8 +165,8 @@ pub struct SessionContext {
     pub context_version: i64,
 }
 
-/// Assemble a context blob for a session's attached realms.
-/// Includes: realm info, pins (with file content), memory (project + global),
+/// Assemble a context blob for a session's attached projects.
+/// Includes: project info, pins (with file content), memory (project + global),
 /// error resolutions, and .hermes/context.json overrides.
 /// Token-aware: estimates tokens per section, trims to budget.
 pub fn assemble_context(
@@ -174,9 +174,9 @@ pub fn assemble_context(
     session_id: &str,
     default_token_budget: usize,
 ) -> Result<SessionContext, String> {
-    let realms = db.get_session_realms(session_id)?;
+    let projects = db.get_session_projects(session_id)?;
 
-    let mut realm_contexts = Vec::new();
+    let mut project_contexts = Vec::new();
     let mut all_conventions = Vec::new();
     let mut all_languages = Vec::new();
     let mut all_frameworks = Vec::new();
@@ -186,9 +186,9 @@ pub fn assemble_context(
     // Determine token budget (may be overridden by .hermes/context.json)
     let mut token_budget = default_token_budget;
 
-    for realm in &realms {
+    for project in &projects {
         // Load .hermes/context.json if present
-        if let Some(config) = load_hermes_config(&realm.path) {
+        if let Some(config) = load_hermes_config(&project.path) {
             if let Some(budget) = config.token_budget {
                 token_budget = budget;
             }
@@ -196,11 +196,11 @@ pub fn assemble_context(
         }
 
         // Get conventions from the dedicated table (higher fidelity)
-        let db_conventions = db.get_conventions(&realm.id)?;
+        let db_conventions = db.get_conventions(&project.id)?;
         let mut conv_rules: Vec<String> = if !db_conventions.is_empty() {
             db_conventions.iter().map(|c| c.rule.clone()).collect()
         } else {
-            realm.conventions.iter().map(|c| c.rule.clone()).collect()
+            project.conventions.iter().map(|c| c.rule.clone()).collect()
         };
 
         // Merge .hermes conventions (human-authored take priority)
@@ -212,20 +212,20 @@ pub fn assemble_context(
             }
         }
 
-        let arch_pattern = realm.architecture.as_ref().map(|a| a.pattern.clone());
-        let arch_layers = realm
+        let arch_pattern = project.architecture.as_ref().map(|a| a.pattern.clone());
+        let arch_layers = project
             .architecture
             .as_ref()
             .map(|a| a.layers.clone())
             .unwrap_or_default();
 
         // Collect unique values
-        for lang in &realm.languages {
+        for lang in &project.languages {
             if !all_languages.contains(lang) {
                 all_languages.push(lang.clone());
             }
         }
-        for fw in &realm.frameworks {
+        for fw in &project.frameworks {
             if !all_frameworks.contains(fw) {
                 all_frameworks.push(fw.clone());
             }
@@ -237,14 +237,14 @@ pub fn assemble_context(
         }
 
         // Estimate tokens: ~4 chars per token
-        let realm_token_est = realm.name.len() / 4
-            + realm.path.len() / 4
-            + realm
+        let project_token_est = project.name.len() / 4
+            + project.path.len() / 4
+            + project
                 .languages
                 .iter()
                 .map(|l| l.len() / 4 + 1)
                 .sum::<usize>()
-            + realm
+            + project
                 .frameworks
                 .iter()
                 .map(|f| f.len() / 4 + 1)
@@ -254,24 +254,24 @@ pub fn assemble_context(
             + conv_rules.iter().map(|c| c.len() / 4 + 1).sum::<usize>()
             + 20; // overhead
 
-        estimated_tokens += realm_token_est;
+        estimated_tokens += project_token_est;
 
-        realm_contexts.push(RealmContext {
-            realm_id: realm.id.clone(),
-            realm_name: realm.name.clone(),
-            path: realm.path.clone(),
-            languages: realm.languages.clone(),
-            frameworks: realm.frameworks.clone(),
+        project_contexts.push(ProjectContext {
+            project_id: project.id.clone(),
+            project_name: project.name.clone(),
+            path: project.path.clone(),
+            languages: project.languages.clone(),
+            frameworks: project.frameworks.clone(),
             architecture_pattern: arch_pattern,
             architecture_layers: arch_layers,
             conventions: conv_rules,
-            scan_status: realm.scan_status.clone(),
+            scan_status: project.scan_status.clone(),
         });
     }
 
-    // Trim if over budget — remove conventions from least-important realms first
-    if estimated_tokens > token_budget && realm_contexts.len() > 1 {
-        for ctx in realm_contexts.iter_mut().skip(1) {
+    // Trim if over budget — remove conventions from least-important projects first
+    if estimated_tokens > token_budget && project_contexts.len() > 1 {
+        for ctx in project_contexts.iter_mut().skip(1) {
             let conv_tokens: usize = ctx.conventions.iter().map(|c| c.len() / 4 + 1).sum();
             if estimated_tokens - conv_tokens < token_budget {
                 let keep = (ctx.conventions.len() * token_budget) / estimated_tokens;
@@ -285,11 +285,11 @@ pub fn assemble_context(
     }
 
     // Fetch context pins — session-scoped + project-scoped (shared across sessions)
-    let realm_ids: Vec<String> = realms.iter().map(|r| r.id.clone()).collect();
-    let primary_realm_id = realm_ids.first().cloned();
+    let project_ids: Vec<String> = projects.iter().map(|r| r.id.clone()).collect();
+    let primary_project_id = project_ids.first().cloned();
 
     let mut pins_raw = db
-        .get_context_pins(Some(session_id), primary_realm_id.as_deref())
+        .get_context_pins(Some(session_id), primary_project_id.as_deref())
         .unwrap_or_default();
 
     // Add pins from .hermes/context.json (project defaults)
@@ -303,7 +303,7 @@ pub fn assemble_context(
                 pins_raw.push(crate::db::ContextPin {
                     id: 0, // synthetic
                     session_id: None,
-                    project_id: primary_realm_id.clone(),
+                    project_id: primary_project_id.clone(),
                     kind: hermes_pin.kind.clone(),
                     target: hermes_pin.target.clone(),
                     label: hermes_pin.label.clone(),
@@ -336,7 +336,7 @@ pub fn assemble_context(
     }
 
     // Fetch merged memory: project-scoped → global (project takes precedence)
-    let memory_raw = db.get_merged_memory(&realm_ids).unwrap_or_default();
+    let memory_raw = db.get_merged_memory(&project_ids).unwrap_or_default();
     let mut memory: Vec<MemoryContext> = memory_raw
         .iter()
         .map(|m| MemoryContext {
@@ -375,7 +375,7 @@ pub fn assemble_context(
     let context_version = snapshots.first().map(|s| s.version).unwrap_or(0);
 
     Ok(SessionContext {
-        realms: realm_contexts,
+        projects: project_contexts,
         pins,
         memory,
         error_resolutions,
@@ -419,23 +419,29 @@ fn format_context_markdown(context: &SessionContext, execution_mode: Option<&str
     ));
 
     // Projects
-    if !context.realms.is_empty() {
+    if !context.projects.is_empty() {
         md.push_str("\n## Projects\n\n");
-        for realm in &context.realms {
-            md.push_str(&format!("### {} ({})\n", realm.realm_name, realm.path));
-            if !realm.languages.is_empty() {
-                md.push_str(&format!("- Languages: {}\n", realm.languages.join(", ")));
+        for project in &context.projects {
+            md.push_str(&format!(
+                "### {} ({})\n",
+                project.project_name, project.path
+            ));
+            if !project.languages.is_empty() {
+                md.push_str(&format!("- Languages: {}\n", project.languages.join(", ")));
             }
-            if !realm.frameworks.is_empty() {
-                md.push_str(&format!("- Frameworks: {}\n", realm.frameworks.join(", ")));
+            if !project.frameworks.is_empty() {
+                md.push_str(&format!(
+                    "- Frameworks: {}\n",
+                    project.frameworks.join(", ")
+                ));
             }
-            if let Some(ref arch) = realm.architecture_pattern {
+            if let Some(ref arch) = project.architecture_pattern {
                 md.push_str(&format!("- Architecture: {}\n", arch));
             }
-            if !realm.conventions.is_empty() {
+            if !project.conventions.is_empty() {
                 md.push_str(&format!(
                     "- Conventions: {}\n",
-                    realm.conventions.join("; ")
+                    project.conventions.join("; ")
                 ));
             }
             md.push('\n');
@@ -506,7 +512,7 @@ pub fn write_session_context_file(
     let context = assemble_context(db, session_id, DEFAULT_TOKEN_BUDGET)?;
     let path = session_context_path(app, session_id)?;
 
-    let has_content = !context.realms.is_empty()
+    let has_content = !context.projects.is_empty()
         || !context.pins.is_empty()
         || !context.memory.is_empty()
         || !context.error_resolutions.is_empty();
@@ -623,15 +629,15 @@ pub fn fork_session_context(
     db.fork_context_pins(&source_session_id, &target_session_id)
 }
 
-/// Load and apply .hermes/context.json for a realm, creating project-scoped
+/// Load and apply .hermes/context.json for a project, creating project-scoped
 /// pins and memory entries in the database.
 #[tauri::command]
 pub fn load_hermes_project_config(
     state: State<'_, AppState>,
-    realm_id: String,
-    realm_path: String,
+    project_id: String,
+    project_path: String,
 ) -> Result<Option<HermesProjectConfig>, String> {
-    let config = match load_hermes_config(&realm_path) {
+    let config = match load_hermes_config(&project_path) {
         Some(c) => c,
         None => return Ok(None),
     };
@@ -642,7 +648,7 @@ pub fn load_hermes_project_config(
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
     // Check if config has changed since last load
-    if let Ok(Some((_, Some(existing_hash)))) = db.get_hermes_config(&realm_id) {
+    if let Ok(Some((_, Some(existing_hash)))) = db.get_hermes_config(&project_id) {
         if existing_hash == config_hash {
             return Ok(Some(config));
         }
@@ -652,7 +658,7 @@ pub fn load_hermes_project_config(
     for pin in &config.pins {
         let _ = db.add_context_pin(
             None, // session_id = null → project-scoped
-            Some(&realm_id),
+            Some(&project_id),
             &pin.kind,
             &pin.target,
             pin.label.as_deref(),
@@ -664,7 +670,7 @@ pub fn load_hermes_project_config(
     for mem in &config.memory {
         let _ = db.save_memory_entry(
             "project",
-            &realm_id,
+            &project_id,
             &mem.key,
             &mem.value,
             "hermes-config",
@@ -674,7 +680,7 @@ pub fn load_hermes_project_config(
     }
 
     // Save config hash
-    let _ = db.save_hermes_config(&realm_id, &config_json, &config_hash);
+    let _ = db.save_hermes_config(&project_id, &config_json, &config_hash);
 
     Ok(Some(config))
 }

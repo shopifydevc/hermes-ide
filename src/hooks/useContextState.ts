@@ -24,7 +24,7 @@ function emptyContext(): ContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "",
     agent: null,
@@ -48,10 +48,10 @@ export function formatContextMarkdown(ctx: ContextState, version: number, execut
   lines.push("");
 
   // Projects
-  if (ctx.realms.length > 0) {
+  if (ctx.projects.length > 0) {
     lines.push("## Projects");
-    for (const project of ctx.realms) {
-      lines.push(`### ${project.realm_name} (${project.path})`);
+    for (const project of ctx.projects) {
+      lines.push(`### ${project.project_name} (${project.path})`);
       if (project.languages.length > 0) lines.push(`- Languages: ${project.languages.join(", ")}`);
       if (project.frameworks.length > 0) lines.push(`- Frameworks: ${project.frameworks.join(", ")}`);
       if (project.architecture_pattern) lines.push(`- Architecture: ${project.architecture_pattern}`);
@@ -152,7 +152,7 @@ export function useContextState(session: SessionData | null, executionMode?: str
       // Fetch project context (includes token budget and estimated tokens)
       try {
         const ctx = await assembleSessionContext(session.id, DEFAULT_TOKEN_BUDGET);
-        initial.realms = ctx.realms;
+        initial.projects = ctx.projects;
         if (ctx.token_budget != null) setTokenBudget(ctx.token_budget);
         if (ctx.estimated_tokens != null) setEstimatedTokens(ctx.estimated_tokens);
       } catch (err) { console.warn("[useContextState] Failed to assemble session context:", err); }
@@ -236,7 +236,7 @@ export function useContextState(session: SessionData | null, executionMode?: str
     if (!session) return;
     let cancelled = false;
     let unlisten: (() => void) | null = null;
-    listen(`session-realms-updated-${session.id}`, () => {
+    listen(`session-projects-updated-${session.id}`, () => {
       if (cancelled) return;
       // GUARD: Ignore project events before initial load completes — the initial
       // load fetches project data. If an event fires first, it creates a
@@ -248,8 +248,8 @@ export function useContextState(session: SessionData | null, executionMode?: str
         .then((ctx) => {
           if (!cancelled) {
             setContext((prev) => {
-              if (structuralEqual(prev.realms, ctx.realms)) return prev; // no-op if unchanged
-              return { ...prev, realms: ctx.realms };
+              if (structuralEqual(prev.projects, ctx.projects)) return prev; // no-op if unchanged
+              return { ...prev, projects: ctx.projects };
             });
             if (ctx.token_budget != null) setTokenBudget(ctx.token_budget);
             if (ctx.estimated_tokens != null) setEstimatedTokens(ctx.estimated_tokens);

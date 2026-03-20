@@ -61,13 +61,13 @@
   overflow-x: hidden;
 }
 
-/* ─── Realm (Project) Group ───────────────────────────────────────── */
+/* ─── Project Group ──────────────────────────────────────────────── */
 
-.worktree-overview-realm {
+.worktree-overview-project {
   border-bottom: 1px solid var(--border);
 }
 
-.worktree-overview-realm-header {
+.worktree-overview-project-header {
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -75,11 +75,11 @@
   cursor: pointer;
   user-select: none;
 }
-.worktree-overview-realm-header:hover {
+.worktree-overview-project-header:hover {
   background: var(--bg-hover);
 }
 
-.worktree-overview-realm-chevron {
+.worktree-overview-project-chevron {
   color: var(--text-3);
   font-size: 10px;
   transition: transform 0.15s;
@@ -87,17 +87,17 @@
   width: 12px;
   text-align: center;
 }
-.worktree-overview-realm-chevron-open {
+.worktree-overview-project-chevron-open {
   transform: rotate(90deg);
 }
 
-.worktree-overview-realm-icon {
+.worktree-overview-project-icon {
   flex-shrink: 0;
   color: var(--text-2);
   font-size: var(--text-sm);
 }
 
-.worktree-overview-realm-name {
+.worktree-overview-project-name {
   color: var(--text-0);
   font-weight: 500;
   flex: 1;
@@ -107,7 +107,7 @@
   font-size: var(--text-xs);
 }
 
-.worktree-overview-realm-count {
+.worktree-overview-project-count {
   background: var(--accent-dim);
   color: var(--accent);
   font-size: var(--text-xs);
@@ -116,7 +116,7 @@
   flex-shrink: 0;
 }
 
-.worktree-overview-realm-path {
+.worktree-overview-project-path {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -126,13 +126,13 @@
   overflow: hidden;
 }
 
-.worktree-overview-realm-path-text {
+.worktree-overview-project-path-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.worktree-overview-realm-body {
+.worktree-overview-project-body {
   padding: 0 var(--space-1) var(--space-1);
 }
 

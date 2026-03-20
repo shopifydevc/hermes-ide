@@ -16,21 +16,21 @@ export async function copyContextToClipboard(
 ): Promise<void> {
   if (!session) return;
 
-  const [pinsResult, realmsResult, memoryResult] = await Promise.allSettled([
+  const [pinsResult, projectsResult, memoryResult] = await Promise.allSettled([
     getContextPins(session.id, null),
     assembleSessionContext(session.id, 4000),
     getAllMemory("global", "global"),
   ]);
 
   const pins = pinsResult.status === "fulfilled" ? pinsResult.value : [];
-  const projectCtx = realmsResult.status === "fulfilled" ? realmsResult.value : { realms: [] };
+  const projectCtx = projectsResult.status === "fulfilled" ? projectsResult.value : { projects: [] };
   const persistedMemory = memoryResult.status === "fulfilled" ? memoryResult.value : [];
 
   const ctx: ContextState = {
     pinnedItems: pins,
     memoryFacts: session.metrics.memory_facts,
     persistedMemory,
-    realms: projectCtx.realms,
+    projects: projectCtx.projects,
     workspacePaths: session.workspace_paths,
     workingDirectory: session.working_directory,
     agent: session.detected_agent?.name ?? null,

@@ -8,29 +8,29 @@ export interface WorktreeCreateResult {
 }
 
 /**
- * Subscribe to worktree lifecycle events for a given realm.
+ * Subscribe to worktree lifecycle events for a given project.
  *
  * The backend emits:
- *   - `worktree-created-{realmId}` with a {@link WorktreeCreateResult} payload
- *   - `worktree-removed-{realmId}` with no payload
+ *   - `worktree-created-{projectId}` with a {@link WorktreeCreateResult} payload
+ *   - `worktree-removed-{projectId}` with no payload
  *
  * Listeners are automatically cleaned up when the component unmounts or
- * `realmId` changes.
+ * `projectId` changes.
  */
 export function useWorktreeEvents(
-  realmId: string | null,
+  projectId: string | null,
   callbacks: {
     onWorktreeCreated?: (data: WorktreeCreateResult) => void;
     onWorktreeRemoved?: () => void;
   },
 ) {
   useEffect(() => {
-    if (!realmId) return;
+    if (!projectId) return;
 
     let cancelled = false;
     const unlisteners: (() => void)[] = [];
 
-    listen<WorktreeCreateResult>(`worktree-created-${realmId}`, (event) => {
+    listen<WorktreeCreateResult>(`worktree-created-${projectId}`, (event) => {
       if (!cancelled) {
         callbacks.onWorktreeCreated?.(event.payload);
       }
@@ -42,7 +42,7 @@ export function useWorktreeEvents(
       }
     });
 
-    listen(`worktree-removed-${realmId}`, () => {
+    listen(`worktree-removed-${projectId}`, () => {
       if (!cancelled) {
         callbacks.onWorktreeRemoved?.();
       }
@@ -58,7 +58,7 @@ export function useWorktreeEvents(
       cancelled = true;
       unlisteners.forEach((fn) => fn());
     };
-  }, [realmId]);
+  }, [projectId]);
 }
 
 /**

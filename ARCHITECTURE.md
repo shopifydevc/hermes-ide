@@ -27,7 +27,7 @@ Hermes IDE is a desktop application built on [Tauri 2](https://tauri.app). The f
 │                  Rust Backend                         │
 │                                                       │
 │  ┌──────────┐  ┌──────┐  ┌───────┐  ┌─────────────┐ │
-│  │   PTY    │  │  DB  │  │  Git  │  │   Realm     │ │
+│  │   PTY    │  │  DB  │  │  Git  │  │  Project    │ │
 │  │ Manager  │  │SQLite│  │(git2) │  │  (Scanner)  │ │
 │  └──────────┘  └──────┘  └───────┘  └─────────────┘ │
 └──────────────────────────────────────────────────────┘
@@ -43,9 +43,9 @@ These are domain-specific terms used throughout the codebase:
 
 | Term | Definition |
 |------|-----------|
-| **Realm** | A registered project directory. Realms are scanned to discover structure, languages, and frameworks. They provide context to AI agents working in terminal sessions. Internally stored in the `realms` table. |
-| **Cartography** | The process of scanning a project directory to discover its structure. There are three scan depths: **surface** (marker files, < 2s), **deep** (config files + architecture detection, < 30s), and **full** (import analysis + entry points, minutes). See `src-tauri/src/realm/cartography.rs`. |
-| **Attunement** | The process of assembling project context from one or more Realms into a token-budgeted Markdown document that gets written to disk and injected into AI agent sessions. See `src-tauri/src/realm/attunement.rs`. |
+| **Project** | A registered project directory. Projects are scanned to discover structure, languages, and frameworks. They provide context to AI agents working in terminal sessions. Internally stored in the `realms` table. |
+| **Cartography** | The process of scanning a project directory to discover its structure. There are three scan depths: **surface** (marker files, < 2s), **deep** (config files + architecture detection, < 30s), and **full** (import analysis + entry points, minutes). See `src-tauri/src/project/cartography.rs`. |
+| **Attunement** | The process of assembling project context from one or more projects into a token-budgeted Markdown document that gets written to disk and injected into AI agent sessions. See `src-tauri/src/project/attunement.rs`. |
 | **Session** | A terminal session backed by a PTY (pseudo-terminal) process. Each session has a unique ID, a color, a working directory, and lifecycle state. Sessions can have AI agents (Claude Code, Aider, Codex, Gemini) running inside them. |
 | **SessionPhase** | The lifecycle state of a session. The state machine is: `Creating` -> `Initializing` -> `ShellReady` -> `LaunchingAgent` -> `Idle` / `Busy` / `NeedsInput` -> `Closing` -> `Destroyed`. Defined in `src-tauri/src/pty/mod.rs`. |
 | **Ghost Text** | Inline command suggestions rendered as semi-transparent overlaid text in the terminal. When the user presses Tab, the ghost text is accepted and written to the PTY. Managed by the `TerminalPool`. |
@@ -55,7 +55,7 @@ These are domain-specific terms used throughout the codebase:
 | **Context Pin** | A file, directory, or text snippet pinned to a session or project. Pinned files have their content included in the assembled context document. Stored in the `context_pins` table. |
 | **Intent Command** | A colon-prefixed shortcut (e.g., `:test`, `:diff`) that the frontend resolves to an actual shell command before sending it to the PTY. See `src/terminal/intentCommands.ts`. |
 | **Injection Lock** | A per-session mutex in the frontend state that prevents concurrent context injections into the same terminal. Ensures that context nudges don't race with user input. |
-| **Nudge** | A lightweight write to the PTY that tells the AI agent to re-read its context file. Sent when project context changes (e.g., a Realm is re-scanned or a pin is added). |
+| **Nudge** | A lightweight write to the PTY that tells the AI agent to re-read its context file. Sent when project context changes (e.g., a project is re-scanned or a pin is added). |
 | **Flow Mode** | A minimal UI mode that hides the sidebar and activity bars, leaving only the terminal and a floating toast. Toggled via the Command Palette. |
 
 ---
@@ -81,7 +81,7 @@ All application state flows through a single React Context + `useReducer` patter
 1. Initializes notifications and analytics
 2. Loads settings and applies the theme
 3. Restores sessions from the previous workspace (if configured)
-4. Sets up Tauri event listeners for `session-updated`, `session-removed`, and `session-realms-changed`
+4. Sets up Tauri event listeners for `session-updated`, `session-removed`, and `session-projects-changed`
 5. Starts a periodic auto-save (every 10 seconds)
 
 **Derived hooks** provide memoized slices of state:
@@ -159,8 +159,8 @@ There is no CSS-in-JS. Theming works by swapping CSS custom property values via 
 | File | Backend Module | Purpose |
 |------|---------------|---------|
 | `sessions.ts` | `pty` | Create, close, resize, write to sessions |
-| `projects.ts` | `realm` | CRUD for Realms, attach/detach to sessions, trigger scans |
-| `context.ts` | `realm::attunement` | Context pins, context assembly, config loading |
+| `projects.ts` | `project` | CRUD for projects, attach/detach to sessions, trigger scans |
+| `context.ts` | `project::attunement` | Context pins, context assembly, config loading |
 | `git.ts` | `git` | Status, stage, commit, push, pull, branches, stash, merge, worktrees, search |
 | `intelligence.ts` | `pty` | Shell environment detection, command history |
 | `processes.ts` | `process` | System process listing and management |
@@ -180,8 +180,8 @@ There is no CSS-in-JS. Theming works by swapping CSS custom property values via 
 | `useGitStatus` | Polls `git_status` IPC command at a configurable interval. Returns status, error, and a manual refresh function. |
 | `useProcesses` | Polls the system process list for the Process Panel. |
 | `useFileTree` | Manages file tree state for the File Explorer. |
-| `useContextState` | Manages context panel state (pins, memory, Realm info). |
-| `useSessionProjects` | Listens for `session-realms-updated-{id}` events and provides the session's attached Realms. |
+| `useContextState` | Manages context panel state (pins, memory, Project info). |
+| `useSessionProjects` | Listens for `session-projects-updated-{id}` events and provides the session's attached projects. |
 | `useSessionGitSummary` | Lightweight git summary (branch name, change count) for the top bar. |
 | `useAutoUpdater` | Manages the Tauri auto-update lifecycle (check, download, install). |
 | `useContextMenu` | Provides right-click context menu via native Tauri menus. |
@@ -206,8 +206,8 @@ src-tauri/src/
 │   └── mod.rs      # PTY session lifecycle, output analysis, provider adapters
 ├── db/
 │   └── mod.rs      # SQLite database, migrations, all persistence queries
-├── realm/
-│   ├── mod.rs      # Realm CRUD, IPC commands
+├── project/
+│   ├── mod.rs      # Project CRUD, IPC commands
 │   ├── cartography.rs  # Project scanning (surface, deep, full)
 │   └── attunement.rs   # Context assembly, Markdown formatting, context file I/O
 ├── git/
@@ -288,8 +288,8 @@ The `ProviderRegistry` iterates through adapters on each output line. Once an ag
 |-------|---------|
 | `sessions` | Session metadata (label, color, phase, working directory, scrollback snapshot) |
 | `realms` | Registered projects (path, name, languages, frameworks, architecture, scan status) |
-| `session_realms` | Many-to-many relationship between sessions and realms |
-| `realm_conventions` | Detected coding conventions per realm |
+| `session_realms` | Many-to-many relationship between sessions and projects |
+| `realm_conventions` | Detected coding conventions per project |
 | `token_usage` | Token usage records per session/provider |
 | `cost_daily` | Aggregated daily cost data |
 | `memory` | Persistent memory with scopes (session, project, global) |
@@ -308,7 +308,7 @@ Migrations run on startup via `run_migrations()`, using idempotent `CREATE TABLE
 
 `src-tauri/src/git/mod.rs` uses the `git2` crate (Rust bindings for libgit2) for all git operations. Features include:
 
-- **Status:** Scans all attached Realms for a session, returns per-project file status with staging area info
+- **Status:** Scans all attached projects for a session, returns per-project file status with staging area info
 - **Operations:** Stage, unstage, commit, push, pull with full credential support
 - **Branches:** List, create, checkout, delete branches
 - **Stash:** List, save, apply, pop, drop, clear
@@ -320,11 +320,11 @@ Migrations run on startup via `run_migrations()`, using idempotent `CREATE TABLE
 
 **Credential cascade:** The git module tries multiple authentication methods in order: SSH agent, SSH key files (`~/.ssh/id_ed25519`, `id_rsa`, etc.), Git Credential Manager, and the system credential store.
 
-**Worktree paths:** All git operations resolve the correct working path via `resolve_worktree_path()`, which checks for a session-specific worktree before falling back to the Realm's root path.
+**Worktree paths:** All git operations resolve the correct working path via `resolve_worktree_path()`, which checks for a session-specific worktree before falling back to the project's root path.
 
-### Project Scanning (Realm + Cartography)
+### Project Scanning (Cartography)
 
-The scanning system has three tiers in `src-tauri/src/realm/cartography.rs`:
+The scanning system has three tiers in `src-tauri/src/project/cartography.rs`:
 
 1. **Surface scan** (< 2 seconds) — checks for marker files at the project root (`package.json`, `Cargo.toml`, `go.mod`, etc.) and counts file extensions at depth 2. Detects languages and frameworks.
 
@@ -332,18 +332,18 @@ The scanning system has three tiers in `src-tauri/src/realm/cartography.rs`:
 
 3. **Full scan** (minutes) — extends deep scan by sampling up to 200 source files at depth 5, analyzing import patterns, and detecting entry points.
 
-When a Realm is created, a surface scan runs synchronously and a deep scan is spawned on a background thread. After the deep scan completes, context files are regenerated for all sessions attached to that Realm.
+When a project is created, a surface scan runs synchronously and a deep scan is spawned on a background thread. After the deep scan completes, context files are regenerated for all sessions attached to that project.
 
 ### Context Assembly (Attunement)
 
-`src-tauri/src/realm/attunement.rs` assembles the final context document:
+`src-tauri/src/project/attunement.rs` assembles the final context document:
 
-1. Collects all Realms attached to the session
+1. Collects all projects attached to the session
 2. Loads `.hermes/context.json` project configs (if present) for custom pins, memory, conventions, and token budget overrides
 3. Gathers context pins (session-scoped and project-scoped) with file content
 4. Merges memory entries across scopes (project takes precedence over global)
 5. Estimates token usage per section (~4 chars = 1 token)
-6. Trims to the token budget by removing conventions from lower-priority Realms
+6. Trims to the token budget by removing conventions from lower-priority projects
 7. Formats everything as Markdown and writes it atomically to disk (tmp + rename)
 8. Saves a versioned snapshot to the database
 
@@ -405,7 +405,7 @@ Frontend: dispatch(SESSION_UPDATED) + dispatch(SET_ACTIVE)
 ### How AI Context is Assembled and Delivered
 
 ```
-Realm is created or re-scanned
+Project is created or re-scanned
         │
         ▼
 Backend: cartography::deep_scan() runs on background thread
@@ -413,17 +413,17 @@ Backend: cartography::deep_scan() runs on background thread
         │
         ▼
 Backend: attunement::write_session_context_file()
-  - Assembles context for each session attached to the Realm
+  - Assembles context for each session attached to the project
   - Writes {session_id}.md to disk
         │
         ▼
-Backend: Emits session-realms-changed event
+Backend: Emits session-projects-changed event
         │
         ▼
 Frontend: SessionContext listens, debounces (1.5s), calls nudgeProjectContext()
         │
         ▼
-IPC: invoke("nudge_realm_context", { sessionId })
+IPC: invoke("nudge_project_context", { sessionId })
         │
         ▼
 Backend: PtyManager.nudge_context()
@@ -442,8 +442,8 @@ Frontend: Calls gitStatus(sessionId) via IPC
         │
         ▼
 Backend: git::git_status()
-  1. Fetches all Realms attached to the session
-  2. For each Realm, resolves the worktree path
+  1. Fetches all projects attached to the session
+  2. For each project, resolves the worktree path
   3. Opens the git repository via git2::Repository
   4. Reads branch, remote tracking, ahead/behind counts
   5. Iterates file statuses (staged, unstaged, untracked, conflicted)

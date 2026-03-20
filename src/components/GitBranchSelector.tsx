@@ -6,7 +6,7 @@ import { useContextMenu, buildBranchMenuItems } from "../hooks/useContextMenu";
 
 interface GitBranchSelectorProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
   currentBranch: string | null;
   onRefresh: () => void;
   onToast: (message: string, type?: GitToast["type"]) => void;
@@ -60,7 +60,7 @@ export function validateBranchName(name: string): string | null {
   return null;
 }
 
-export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh, onToast, onClose, triggerRef }: GitBranchSelectorProps) {
+export function GitBranchSelector({ sessionId, projectId, currentBranch, onRefresh, onToast, onClose, triggerRef }: GitBranchSelectorProps) {
   const [branches, setBranches] = useState<GitBranch[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -97,7 +97,7 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
     if (!branch) return;
     switch (actionId) {
       case "branch.checkout":
-        gitCheckoutBranch(sessionId, realmId, branch.name)
+        gitCheckoutBranch(sessionId, projectId, branch.name)
           .then(() => { onRefresh(); onToast(`Checked out ${branch.name}`, "success"); })
           .catch((e) => onToast(String(e), "error"));
         break;
@@ -105,22 +105,22 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
         navigator.clipboard.writeText(branch.name).catch(console.error);
         break;
       case "branch.delete":
-        gitDeleteBranch(sessionId, realmId, branch.name, false)
+        gitDeleteBranch(sessionId, projectId, branch.name, false)
           .then(() => { onRefresh(); onToast(`Deleted ${branch.name}`, "success"); })
           .catch((e) => onToast(String(e), "error"));
         break;
     }
-  }, [sessionId, realmId, onRefresh, onToast]);
+  }, [sessionId, projectId, onRefresh, onToast]);
 
   const { showMenu: showBranchMenu } = useContextMenu(handleBranchAction);
 
   const loadBranches = useCallback(async () => {
     try {
       setLoading(true);
-      const result = await gitListBranches(sessionId, realmId);
+      const result = await gitListBranches(sessionId, projectId);
       setBranches(result);
       // Lazily enrich ahead/behind counts in the background after initial render
-      gitBranchesAheadBehind(sessionId, realmId)
+      gitBranchesAheadBehind(sessionId, projectId)
         .then((aheadBehind) => {
           setBranches((prev) =>
             prev.map((b) => {
@@ -135,7 +135,7 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
     } finally {
       setLoading(false);
     }
-  }, [sessionId, realmId]);
+  }, [sessionId, projectId]);
 
   useEffect(() => {
     loadBranches();
@@ -185,14 +185,14 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
   const handleCheckout = useCallback(async (name: string) => {
     try {
       setError(null);
-      const result = await gitCheckoutBranch(sessionId, realmId, name);
+      const result = await gitCheckoutBranch(sessionId, projectId, name);
       onToast(result.message);
       onRefresh();
       onClose();
     } catch (e) {
       setError(String(e));
     }
-  }, [sessionId, realmId, onRefresh, onToast, onClose]);
+  }, [sessionId, projectId, onRefresh, onToast, onClose]);
 
   const handleCreate = useCallback(async () => {
     const validationError = validateBranchName(newName);
@@ -202,7 +202,7 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
     }
     try {
       setError(null);
-      const result = await gitCreateBranch(sessionId, realmId, newName.trim(), true);
+      const result = await gitCreateBranch(sessionId, projectId, newName.trim(), true);
       onToast(result.message);
       setNewName("");
       setCreating(false);
@@ -211,12 +211,12 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
     } catch (e) {
       setError(String(e));
     }
-  }, [sessionId, realmId, newName, onRefresh, onToast, onClose]);
+  }, [sessionId, projectId, newName, onRefresh, onToast, onClose]);
 
   const handleDelete = useCallback(async (name: string, force: boolean) => {
     try {
       setError(null);
-      const result = await gitDeleteBranch(sessionId, realmId, name, force);
+      const result = await gitDeleteBranch(sessionId, projectId, name, force);
       onToast(result.message);
       setConfirmDelete(null);
       loadBranches();
@@ -224,7 +224,7 @@ export function GitBranchSelector({ sessionId, realmId, currentBranch, onRefresh
     } catch (e) {
       setError(String(e));
     }
-  }, [sessionId, realmId, onRefresh, onToast, loadBranches]);
+  }, [sessionId, projectId, onRefresh, onToast, loadBranches]);
 
   const filtered = filterBranches(branches, search);
   const { local, remote } = groupBranches(filtered);

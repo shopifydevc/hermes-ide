@@ -4,7 +4,7 @@ import type { WorktreeInfo, GitBranch } from "../types/git";
 import "../styles/components/RepoOverviewPanel.css";
 
 interface RepoOverviewPanelProps {
-  realmId?: string;
+  projectId?: string;
   /** A sessionId to use for branch listing (any active session on this repo). */
   sessionId: string;
   onOpenSession: (sessionId: string) => void;
@@ -16,7 +16,7 @@ interface RepoOverviewPanelProps {
  * Designed for the sidebar, giving a repo-level view across sessions.
  */
 export function RepoOverviewPanel({
-  realmId: realmIdProp,
+  projectId: projectIdProp,
   sessionId,
   onOpenSession,
   onCreateSession,
@@ -26,30 +26,30 @@ export function RepoOverviewPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAvailable, setShowAvailable] = useState(false);
-  const [resolvedRealmId, setResolvedRealmId] = useState<string | null>(realmIdProp || null);
+  const [resolvedProjectId, setResolvedProjectId] = useState<string | null>(projectIdProp || null);
 
-  // Auto-detect realmId from the session's git status if not provided
+  // Auto-detect projectId from the session's git status if not provided
   useEffect(() => {
-    if (realmIdProp) {
-      setResolvedRealmId(realmIdProp);
+    if (projectIdProp) {
+      setResolvedProjectId(projectIdProp);
       return;
     }
     gitStatus(sessionId)
       .then((status) => {
         const gitProject = status.projects.find((p) => p.is_git_repo);
-        if (gitProject) setResolvedRealmId(gitProject.project_id);
+        if (gitProject) setResolvedProjectId(gitProject.project_id);
       })
       .catch(() => {});
-  }, [sessionId, realmIdProp]);
+  }, [sessionId, projectIdProp]);
 
   const loadData = useCallback(async () => {
-    if (!resolvedRealmId) return;
+    if (!resolvedProjectId) return;
     try {
       setLoading(true);
       setError(null);
       const [wt, br] = await Promise.all([
-        listWorktrees(resolvedRealmId),
-        gitListBranches(sessionId, resolvedRealmId),
+        listWorktrees(resolvedProjectId),
+        gitListBranches(sessionId, resolvedProjectId),
       ]);
       setWorktrees(wt);
       setBranches(br);
@@ -58,11 +58,11 @@ export function RepoOverviewPanel({
     } finally {
       setLoading(false);
     }
-  }, [resolvedRealmId, sessionId]);
+  }, [resolvedProjectId, sessionId]);
 
   useEffect(() => {
-    if (resolvedRealmId) loadData();
-  }, [loadData, resolvedRealmId]);
+    if (resolvedProjectId) loadData();
+  }, [loadData, resolvedProjectId]);
 
   // Branches checked out in worktrees
   const checkedOutBranches = useMemo(() => {

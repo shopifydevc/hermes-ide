@@ -5,10 +5,10 @@ mod menu;
 mod platform;
 mod plugins;
 mod process;
+mod project;
 /// Exposed for benchmarks — not part of the public API.
 #[doc(hidden)]
 pub mod pty;
-mod realm;
 mod transcript;
 mod workspace;
 
@@ -112,17 +112,19 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
 
         // Only remove linked worktrees from disk, not main worktrees
         if !wt.is_main_worktree {
-            if let Ok(Some(realm)) = database.get_realm(&wt.realm_id) {
-                if let Err(e) =
-                    git::worktree::remove_worktree(&realm.path, &wt.session_id, &wt.worktree_path)
-                {
+            if let Ok(Some(project_entry)) = database.get_project(&wt.project_id) {
+                if let Err(e) = git::worktree::remove_worktree(
+                    &project_entry.path,
+                    &wt.session_id,
+                    &wt.worktree_path,
+                ) {
                     log::warn!(
                         "Startup worktree cleanup: failed to remove worktree '{}': {}",
                         wt.worktree_path,
                         e
                     );
                 }
-                repos_to_prune.insert(realm.path.clone());
+                repos_to_prune.insert(project_entry.path.clone());
             }
         }
 
@@ -149,8 +151,8 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
         }
     }
 
-    // Scan all realms for orphaned worktree directories with no DB record
-    if let Ok(realms) = database.get_all_realms() {
+    // Scan all projects for orphaned worktree directories with no DB record
+    if let Ok(projects) = database.get_all_projects() {
         // Collect all known worktree paths from DB for efficient lookup
         let known_paths: HashSet<String> = database
             .get_all_session_worktrees()
@@ -159,8 +161,8 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
             .map(|r| r.worktree_path.clone())
             .collect();
 
-        for realm in &realms {
-            let wt_dir = git::worktree::worktree_dir(&app_data_dir, &realm.path);
+        for proj in &projects {
+            let wt_dir = git::worktree::worktree_dir(&app_data_dir, &proj.path);
             if !wt_dir.is_dir() {
                 continue;
             }
@@ -180,7 +182,7 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
                         // Try git worktree prune first, then remove directory
                         let _ = std::process::Command::new("git")
                             .arg("-C")
-                            .arg(&realm.path)
+                            .arg(&proj.path)
                             .arg("worktree")
                             .arg("prune")
                             .output();
@@ -200,8 +202,8 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
                 }
             }
 
-            // Replay incomplete journal operations for this realm
-            let incomplete = git::journal::get_incomplete_operations(&app_data_dir, &realm.path);
+            // Replay incomplete journal operations for this project
+            let incomplete = git::journal::get_incomplete_operations(&app_data_dir, &proj.path);
             for entry in &incomplete {
                 match entry.action.as_str() {
                     "CREATE" => {
@@ -252,38 +254,38 @@ fn cleanup_stale_worktrees(app: &tauri::AppHandle, database: &db::Database) {
                 }
             }
             // Clear the journal after replay
-            git::journal::clear_journal(&app_data_dir, &realm.path);
+            git::journal::clear_journal(&app_data_dir, &proj.path);
         }
     }
 
     // Migration: clean up old .hermes/worktrees/ directories from previous versions.
     // These are no longer used since worktrees are now stored in the app data directory.
-    if let Ok(realms) = database.get_all_realms() {
-        for realm in &realms {
-            let old_worktree_dir = Path::new(&realm.path).join(".hermes").join("worktrees");
+    if let Ok(projects) = database.get_all_projects() {
+        for proj in &projects {
+            let old_worktree_dir = Path::new(&proj.path).join(".hermes").join("worktrees");
             if old_worktree_dir.is_dir() {
                 log::info!(
                     "Migration: removing old .hermes/worktrees/ from '{}'",
-                    realm.path
+                    proj.path
                 );
                 // Prune git worktree metadata first
                 let _ = std::process::Command::new("git")
                     .arg("-C")
-                    .arg(&realm.path)
+                    .arg(&proj.path)
                     .arg("worktree")
                     .arg("prune")
                     .output();
                 let _ = std::fs::remove_dir_all(&old_worktree_dir);
             }
             // Also clean up the old journal file
-            let old_journal = Path::new(&realm.path)
+            let old_journal = Path::new(&proj.path)
                 .join(".hermes")
                 .join("worktree-journal.log");
             if old_journal.exists() {
                 let _ = std::fs::remove_file(&old_journal);
             }
             // Remove .hermes/ directory if it's now empty
-            let hermes_dir = Path::new(&realm.path).join(".hermes");
+            let hermes_dir = Path::new(&proj.path).join(".hermes");
             if hermes_dir.is_dir() {
                 let _ = std::fs::remove_dir(&hermes_dir); // Only succeeds if empty
             }
@@ -478,7 +480,7 @@ pub fn run() {
             pty::ssh_upload_file,
             pty::ssh_download_file,
             pty::write_to_session,
-            pty::nudge_realm_context,
+            pty::nudge_project_context,
             pty::resize_session,
             pty::close_session,
             pty::save_all_snapshots,
@@ -546,19 +548,19 @@ pub fn run() {
             workspace::scan_directory,
             workspace::detect_project,
             workspace::get_projects,
-            // Realms
-            realm::create_realm,
-            realm::get_realms,
-            realm::get_realm,
-            realm::delete_realm,
-            realm::attach_session_realm,
-            realm::detach_session_realm,
-            realm::get_session_realms,
-            realm::scan_realm,
-            realm::attunement::assemble_session_context,
-            realm::attunement::apply_context,
-            realm::attunement::fork_session_context,
-            realm::attunement::load_hermes_project_config,
+            // Projects
+            project::create_project,
+            project::get_registered_projects,
+            project::get_project,
+            project::delete_project,
+            project::attach_session_project,
+            project::detach_session_project,
+            project::get_session_projects,
+            project::scan_project,
+            project::attunement::assemble_session_context,
+            project::attunement::apply_context,
+            project::attunement::fork_session_context,
+            project::attunement::load_hermes_project_config,
             // Process management
             process::list_processes,
             process::kill_process,
@@ -578,7 +580,7 @@ pub fn run() {
             git::open_file_in_editor,
             // Git branch management
             git::git_list_branches,
-            git::git_list_branches_for_realm,
+            git::git_list_branches_for_project,
             git::git_branches_ahead_behind,
             git::git_create_branch,
             git::git_checkout_branch,
@@ -609,7 +611,7 @@ pub fn run() {
             git::git_list_worktrees,
             git::git_check_branch_available,
             git::git_session_worktree_info,
-            git::git_list_branches_for_realms,
+            git::git_list_branches_for_projects,
             git::git_is_git_repo,
             git::git_worktree_has_changes,
             git::git_stash_worktree,

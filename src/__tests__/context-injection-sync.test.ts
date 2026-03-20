@@ -19,7 +19,7 @@ interface MockContextState {
   pinnedItems: Array<{ id: number; kind: string; target: string; session_id: string | null }>;
   memoryFacts: Array<{ key: string; value: string }>;
   persistedMemory: Array<{ key: string; value: string }>;
-  realms: Array<{ realm_id: string; realm_name: string; languages: string[] }>;
+  projects: Array<{ project_id: string; project_name: string; languages: string[] }>;
   workspacePaths: string[];
   workingDirectory: string;
   agent: string | null;
@@ -31,7 +31,7 @@ function emptyContext(): MockContextState {
     pinnedItems: [],
     memoryFacts: [],
     persistedMemory: [],
-    realms: [],
+    projects: [],
     workspacePaths: [],
     workingDirectory: "",
     agent: null,

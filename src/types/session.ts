@@ -156,7 +156,7 @@ export interface CreateSessionOpts {
   projectIds?: string[];
   branchName?: string;
   createNewBranch?: boolean;
-  /** Per-project branch selections: realmId -> { branch, createNew } */
+  /** Per-project branch selections: projectId -> { branch, createNew } */
   branchSelections?: Record<string, { branch: string; createNew: boolean }>;
   sshHost?: string;
   sshPort?: number;
@@ -274,7 +274,7 @@ export type SessionAction =
   | { type: "OPEN_COMPOSER" }
   | { type: "CLOSE_COMPOSER" }
   // File preview
-  | { type: "SET_FILE_PREVIEW"; realmId: string; filePath: string }
+  | { type: "SET_FILE_PREVIEW"; projectId: string; filePath: string }
   | { type: "CLOSE_FILE_PREVIEW" }
   // Workspace restore
   | { type: "RESTORE_LAYOUT"; root: unknown; focusedPaneId: string | null; activeSessionId: string | null };

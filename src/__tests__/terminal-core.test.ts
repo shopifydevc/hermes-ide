@@ -444,7 +444,7 @@ describe("Invariant 9: Context injection race prevention", () => {
   });
 
   it("project listener is gated by initialLoadDone", () => {
-    expect(CONTEXT_HOOK).toMatch(/session-realms-updated[\s\S]*?initialLoadDone\.current/);
+    expect(CONTEXT_HOOK).toMatch(/session-projects-updated[\s\S]*?initialLoadDone\.current/);
   });
 
   it("pin listener is gated by initialLoadDone", () => {

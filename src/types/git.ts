@@ -167,7 +167,7 @@ export interface SearchResponse {
 export interface SessionWorktree {
   id: string;
   sessionId: string;
-  realmId: string;
+  projectId: string;
   worktreePath: string;
   branchName: string | null;
   isMainWorktree: boolean;
@@ -236,9 +236,9 @@ export interface WorktreeOverviewEntry {
   branch_name: string | null;
   session_id: string;
   session_label: string;
-  realm_id: string;
-  realm_name: string;
-  realm_path: string;
+  project_id: string;
+  project_name: string;
+  root_path: string;
   is_main_worktree: boolean;
   created_at: string;
   last_activity_at: string | null;
@@ -248,7 +248,7 @@ export interface OrphanWorktree {
   worktree_path: string;
   branch_name: string | null;
   kind: "directory_only" | "record_only";
-  realm_path: string | null;
+  root_path: string | null;
   session_id: string | null;
 }
 

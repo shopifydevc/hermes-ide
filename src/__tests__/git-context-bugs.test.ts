@@ -993,7 +993,7 @@ describe("Context formatContextMarkdown edge cases", () => {
       pinnedItems: [],
       memoryFacts: [],
       persistedMemory: [],
-      realms: [],
+      projects: [],
       workspacePaths: [],
       workingDirectory: "/home/user/project",
       agent: null,

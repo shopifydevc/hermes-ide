@@ -266,7 +266,7 @@ describe("SessionWorktree type shape", () => {
     const wt = {
       id: "wt-1",
       sessionId: "s1",
-      realmId: "r1",
+      projectId: "r1",
       worktreePath: "/repos/.worktrees/feat",
       branchName: "feat",
       isMainWorktree: false,
@@ -274,7 +274,7 @@ describe("SessionWorktree type shape", () => {
     };
     expect(wt).toHaveProperty("id");
     expect(wt).toHaveProperty("sessionId");
-    expect(wt).toHaveProperty("realmId");
+    expect(wt).toHaveProperty("projectId");
     expect(wt).toHaveProperty("worktreePath");
     expect(wt).toHaveProperty("branchName");
     expect(wt).toHaveProperty("isMainWorktree");
@@ -285,7 +285,7 @@ describe("SessionWorktree type shape", () => {
     const wt = {
       id: "wt-2",
       sessionId: "s2",
-      realmId: "r1",
+      projectId: "r1",
       worktreePath: "/repos/.worktrees/detached",
       branchName: null as string | null,
       isMainWorktree: false,

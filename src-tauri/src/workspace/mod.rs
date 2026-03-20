@@ -343,5 +343,5 @@ pub fn detect_project(
 #[tauri::command]
 pub fn get_projects(state: State<'_, AppState>) -> Result<Vec<ProjectInfo>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_all_projects()
+    db.get_all_detected_projects()
 }

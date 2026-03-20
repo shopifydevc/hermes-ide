@@ -24,7 +24,7 @@ pub struct Convention {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Realm {
+pub struct Project {
     pub id: String,
     pub path: String,
     pub name: String,
@@ -41,12 +41,12 @@ pub struct Realm {
 // ─── IPC Commands ────────────────────────────────────────────────────
 
 #[tauri::command]
-pub fn create_realm(
+pub fn create_project(
     state: State<'_, AppState>,
     app: AppHandle,
     path: String,
     name: Option<String>,
-) -> Result<Realm, String> {
+) -> Result<Project, String> {
     // Canonicalize so "." / "./" becomes an absolute path
     let canonical =
         std::fs::canonicalize(&path).map_err(|e| format!("Cannot resolve path {}: {}", path, e))?;
@@ -56,7 +56,7 @@ pub fn create_realm(
         return Err(format!("Path {} is not a directory", resolved_path));
     }
 
-    let realm_name = name.unwrap_or_else(|| {
+    let project_name = name.unwrap_or_else(|| {
         canonical
             .file_name()
             .and_then(|n| n.to_str())
@@ -75,14 +75,14 @@ pub fn create_realm(
         serde_json::to_string(&scan_result.frameworks).unwrap_or_else(|_| "[]".to_string());
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.insert_realm(
+    db.insert_project(
         &id,
         &resolved_path,
-        &realm_name,
+        &project_name,
         &languages_json,
         &frameworks_json,
     )?;
-    db.update_realm_scan(
+    db.update_project_scan(
         &id,
         "surface",
         None,
@@ -91,16 +91,16 @@ pub fn create_realm(
         Some(&frameworks_json),
     )?;
 
-    let realm = db
-        .get_realm(&id)?
-        .ok_or_else(|| "Failed to fetch created realm".to_string())?;
+    let project = db
+        .get_project(&id)?
+        .ok_or_else(|| "Failed to fetch created project".to_string())?;
 
     // Emit event for frontend
-    let _ = app.emit("realm-updated", &realm);
+    let _ = app.emit("project-updated", &project);
 
     // Spawn background deep scan
     let app_clone = app.clone();
-    let realm_id = id.clone();
+    let project_id = id.clone();
     let scan_path = resolved_path.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(2));
@@ -121,8 +121,8 @@ pub fn create_realm(
 
         if let Some(state) = app_clone.try_state::<AppState>() {
             if let Ok(db) = state.db.lock() {
-                let _ = db.update_realm_scan(
-                    &realm_id,
+                let _ = db.update_project_scan(
+                    &project_id,
                     "deep",
                     arch_json.as_deref(),
                     conv_json.as_deref(),
@@ -131,15 +131,19 @@ pub fn create_realm(
                 );
                 // Store conventions individually
                 for conv in &deep_result.conventions {
-                    let _ =
-                        db.insert_convention(&realm_id, &conv.rule, &conv.source, conv.confidence);
+                    let _ = db.insert_convention(
+                        &project_id,
+                        &conv.rule,
+                        &conv.source,
+                        conv.confidence,
+                    );
                 }
-                // Emit updated realm
-                if let Ok(Some(updated)) = db.get_realm(&realm_id) {
-                    let _ = app_clone.emit("realm-updated", &updated);
+                // Emit updated project
+                if let Ok(Some(updated)) = db.get_project(&project_id) {
+                    let _ = app_clone.emit("project-updated", &updated);
                 }
-                // Update context files for all sessions attached to this realm
-                if let Ok(session_ids) = db.get_sessions_for_realm(&realm_id) {
+                // Update context files for all sessions attached to this project
+                if let Ok(session_ids) = db.get_sessions_for_project(&project_id) {
                     for sid in &session_ids {
                         let _ = attunement::write_session_context_file(&app_clone, &db, sid);
                     }
@@ -148,102 +152,108 @@ pub fn create_realm(
         }
     });
 
-    Ok(realm)
+    Ok(project)
 }
 
 #[tauri::command]
-pub fn get_realms(state: State<'_, AppState>) -> Result<Vec<Realm>, String> {
+pub fn get_registered_projects(state: State<'_, AppState>) -> Result<Vec<Project>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_all_realms()
+    db.get_all_projects()
 }
 
 #[tauri::command]
-pub fn get_realm(state: State<'_, AppState>, id: String) -> Result<Option<Realm>, String> {
+pub fn get_project(state: State<'_, AppState>, id: String) -> Result<Option<Project>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_realm(&id)
+    db.get_project(&id)
 }
 
 #[tauri::command]
-pub fn delete_realm(state: State<'_, AppState>, id: String) -> Result<(), String> {
+pub fn delete_project(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.delete_realm(&id)
+    db.delete_project(&id)
 }
 
 #[tauri::command]
-pub fn attach_session_realm(
+pub fn attach_session_project(
     state: State<'_, AppState>,
     app: AppHandle,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     role: Option<String>,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.attach_session_realm(
+    db.attach_session_project(
         &session_id,
-        &realm_id,
+        &project_id,
         &role.unwrap_or_else(|| "primary".to_string()),
     )?;
 
     // Write context file for the session
     let _ = attunement::write_session_context_file(&app, &db, &session_id);
 
-    // Emit updated realms list for the session
-    let realms = db.get_session_realms(&session_id)?;
-    let _ = app.emit(&format!("session-realms-updated-{}", session_id), &realms);
+    // Emit updated projects list for the session
+    let projects = db.get_session_projects(&session_id)?;
+    let _ = app.emit(
+        &format!("session-projects-updated-{}", session_id),
+        &projects,
+    );
 
-    // Notify frontend that realms changed (for debounced nudge)
-    let _ = app.emit("session-realms-changed", &session_id);
+    // Notify frontend that projects changed (for debounced nudge)
+    let _ = app.emit("session-projects-changed", &session_id);
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn detach_session_realm(
+pub fn detach_session_project(
     state: State<'_, AppState>,
     app: AppHandle,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.detach_session_realm(&session_id, &realm_id)?;
+    db.detach_session_project(&session_id, &project_id)?;
 
-    // Write context file for the session (will delete file if no realms remain)
+    // Write context file for the session (will delete file if no projects remain)
     let _ = attunement::write_session_context_file(&app, &db, &session_id);
 
-    let realms = db.get_session_realms(&session_id)?;
-    let _ = app.emit(&format!("session-realms-updated-{}", session_id), &realms);
+    let projects = db.get_session_projects(&session_id)?;
+    let _ = app.emit(
+        &format!("session-projects-updated-{}", session_id),
+        &projects,
+    );
 
-    // Notify frontend that realms changed (for debounced nudge)
-    let _ = app.emit("session-realms-changed", &session_id);
+    // Notify frontend that projects changed (for debounced nudge)
+    let _ = app.emit("session-projects-changed", &session_id);
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_session_realms(
+pub fn get_session_projects(
     state: State<'_, AppState>,
     session_id: String,
-) -> Result<Vec<Realm>, String> {
+) -> Result<Vec<Project>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    db.get_session_realms(&session_id)
+    db.get_session_projects(&session_id)
 }
 
 #[tauri::command]
-pub fn scan_realm(
+pub fn scan_project(
     state: State<'_, AppState>,
     app: AppHandle,
     id: String,
     depth: Option<String>,
 ) -> Result<(), String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    let realm = db
-        .get_realm(&id)?
-        .ok_or_else(|| "Realm not found".to_string())?;
+    let project = db
+        .get_project(&id)?
+        .ok_or_else(|| "Project not found".to_string())?;
     drop(db);
 
     let depth = depth.unwrap_or_else(|| "deep".to_string());
-    let scan_path = realm.path.clone();
-    let realm_id = realm.id.clone();
+    let scan_path = project.path.clone();
+    let project_id = project.id.clone();
     let app_clone = app.clone();
 
     std::thread::spawn(move || {
@@ -279,8 +289,8 @@ pub fn scan_realm(
 
         if let Some(state) = app_clone.try_state::<AppState>() {
             if let Ok(db) = state.db.lock() {
-                let _ = db.update_realm_scan(
-                    &realm_id,
+                let _ = db.update_project_scan(
+                    &project_id,
                     &depth,
                     arch_json.as_deref(),
                     conv_json.as_deref(),
@@ -288,14 +298,18 @@ pub fn scan_realm(
                     fws_json.as_deref(),
                 );
                 for conv in &result.conventions {
-                    let _ =
-                        db.insert_convention(&realm_id, &conv.rule, &conv.source, conv.confidence);
+                    let _ = db.insert_convention(
+                        &project_id,
+                        &conv.rule,
+                        &conv.source,
+                        conv.confidence,
+                    );
                 }
-                if let Ok(Some(updated)) = db.get_realm(&realm_id) {
-                    let _ = app_clone.emit("realm-updated", &updated);
+                if let Ok(Some(updated)) = db.get_project(&project_id) {
+                    let _ = app_clone.emit("project-updated", &updated);
                 }
-                // Update context files for all sessions attached to this realm
-                if let Ok(session_ids) = db.get_sessions_for_realm(&realm_id) {
+                // Update context files for all sessions attached to this project
+                if let Ok(session_ids) = db.get_sessions_for_project(&project_id) {
                     for sid in &session_ids {
                         let _ = attunement::write_session_context_file(&app_clone, &db, sid);
                     }

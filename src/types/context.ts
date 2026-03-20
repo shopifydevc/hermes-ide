@@ -12,8 +12,8 @@ export interface ContextPin {
 }
 
 export interface ProjectContextInfo {
-  realm_id: string;
-  realm_name: string;
+  project_id: string;
+  project_name: string;
   path: string;
   languages: string[];
   frameworks: string[];
@@ -47,7 +47,7 @@ export interface ContextState {
   pinnedItems: ContextPin[];
   memoryFacts: Pick<PersistedMemory, 'key' | 'value' | 'source' | 'confidence'>[];
   persistedMemory: Pick<PersistedMemory, 'key' | 'value' | 'source'>[];
-  realms: ProjectContextInfo[];
+  projects: ProjectContextInfo[];
   workspacePaths: string[];
   workingDirectory: string;
   agent: string | null;

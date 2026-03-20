@@ -28,6 +28,6 @@ export function forkSessionContext(sourceSessionId: string, targetSessionId: str
   return invoke<number>("fork_session_context", { sourceSessionId, targetSessionId });
 }
 
-export function loadHermesProjectConfig(realmId: string, realmPath: string): Promise<HermesProjectConfig | null> {
-  return invoke<HermesProjectConfig | null>("load_hermes_project_config", { realmId, realmPath });
+export function loadHermesProjectConfig(projectId: string, projectPath: string): Promise<HermesProjectConfig | null> {
+  return invoke<HermesProjectConfig | null>("load_hermes_project_config", { projectId, projectPath });
 }

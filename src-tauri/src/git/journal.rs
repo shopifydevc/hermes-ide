@@ -13,14 +13,14 @@ pub fn journal_path(app_data_dir: &Path, repo_path: &str) -> std::path::PathBuf 
     dir.join(JOURNAL_FILENAME)
 }
 
-/// Log format: ACTION\tsession_id\trealm_id\tbranch\tworktree_path\ttimestamp
+/// Log format: ACTION\tsession_id\tproject_id\tbranch\tworktree_path\ttimestamp
 /// When ACTION completes, a COMPLETED line is appended.
 pub fn log_operation(
     app_data_dir: &Path,
     repo_path: &str,
     action: &str,
     session_id: &str,
-    realm_id: &str,
+    project_id: &str,
     branch: &str,
     worktree_path: &str,
 ) -> Result<(), String> {
@@ -35,7 +35,7 @@ pub fn log_operation(
     let timestamp = chrono::Utc::now().to_rfc3339();
     let line = format!(
         "{}\t{}\t{}\t{}\t{}\t{}\n",
-        action, session_id, realm_id, branch, worktree_path, timestamp
+        action, session_id, project_id, branch, worktree_path, timestamp
     );
     let mut file = OpenOptions::new()
         .create(true)
@@ -59,14 +59,14 @@ pub fn log_completed(
     repo_path: &str,
     action: &str,
     session_id: &str,
-    realm_id: &str,
+    project_id: &str,
 ) -> Result<(), String> {
     log_operation(
         app_data_dir,
         repo_path,
         &format!("COMPLETED_{}", action),
         session_id,
-        realm_id,
+        project_id,
         "",
         "",
     )
@@ -95,12 +95,12 @@ pub fn get_incomplete_operations(app_data_dir: &Path, repo_path: &str) -> Vec<Jo
 
         let action = parts[0];
         let session_id = parts[1];
-        let realm_id = parts[2];
+        let project_id = parts[2];
         let key = format!(
             "{}|{}|{}",
             action.replace("COMPLETED_", ""),
             session_id,
-            realm_id
+            project_id
         );
 
         if action.starts_with("COMPLETED_") {
@@ -111,7 +111,7 @@ pub fn get_incomplete_operations(app_data_dir: &Path, repo_path: &str) -> Vec<Jo
                 JournalEntry {
                     action: action.to_string(),
                     session_id: session_id.to_string(),
-                    realm_id: realm_id.to_string(),
+                    project_id: project_id.to_string(),
                     branch: parts[3].to_string(),
                     worktree_path: parts[4].to_string(),
                     timestamp: parts.get(5).unwrap_or(&"").to_string(),
@@ -133,7 +133,7 @@ pub fn clear_journal(app_data_dir: &Path, repo_path: &str) {
 pub struct JournalEntry {
     pub action: String,
     pub session_id: String,
-    pub realm_id: String,
+    pub project_id: String,
     pub branch: String,
     pub worktree_path: String,
     pub timestamp: String,

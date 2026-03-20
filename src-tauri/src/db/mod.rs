@@ -135,7 +135,7 @@ pub struct CostDailyEntry {
 pub struct SessionWorktreeRow {
     pub id: String,
     pub session_id: String,
-    pub realm_id: String,
+    pub project_id: String,
     pub worktree_path: String,
     pub branch_name: Option<String>,
     pub is_main_worktree: bool,
@@ -417,7 +417,7 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_plugin_storage_plugin ON plugin_storage(plugin_id);
         ").map_err(|e| format!("Migration failed: {}", e))?;
 
-        // Migrate existing projects → realms (one-time, idempotent)
+        // Migrate existing workspace projects table → realms table (one-time, idempotent)
         self.conn.execute_batch("
             INSERT OR IGNORE INTO realms (id, path, name, languages, frameworks, scan_status, created_at, updated_at)
             SELECT id, path, name,
@@ -427,7 +427,7 @@ impl Database {
                    created_at,
                    updated_at
             FROM projects;
-        ").map_err(|e| format!("Project→Realm migration failed: {}", e))?;
+        ").map_err(|e| format!("Workspace projects migration failed: {}", e))?;
 
         // Add description column to sessions (idempotent)
         let _ = self
@@ -874,7 +874,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_all_projects(&self) -> Result<Vec<crate::workspace::ProjectInfo>, String> {
+    pub fn get_all_detected_projects(&self) -> Result<Vec<crate::workspace::ProjectInfo>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, detected_languages, detected_frameworks, created_at FROM projects ORDER BY updated_at DESC"
         ).map_err(|e| e.to_string())?;
@@ -1115,14 +1115,14 @@ impl Database {
     }
 
     /// Get merged memory: project-scoped + global, with project taking precedence.
-    /// Fetches all project-scoped entries in a single query instead of one per realm.
-    pub fn get_merged_memory(&self, realm_ids: &[String]) -> Result<Vec<MemoryEntry>, String> {
+    /// Fetches all project-scoped entries in a single query instead of one per project.
+    pub fn get_merged_memory(&self, project_ids: &[String]) -> Result<Vec<MemoryEntry>, String> {
         let mut seen_keys = std::collections::HashSet::new();
         let mut result = Vec::new();
 
         // Batch-fetch all project-scoped entries in one query
-        if !realm_ids.is_empty() {
-            let placeholders: Vec<String> = realm_ids
+        if !project_ids.is_empty() {
+            let placeholders: Vec<String> = project_ids
                 .iter()
                 .enumerate()
                 .map(|(i, _)| format!("?{}", i + 1))
@@ -1135,7 +1135,7 @@ impl Database {
                 placeholders.join(", ")
             );
             let mut stmt = self.conn.prepare(&sql).map_err(|e| e.to_string())?;
-            let params: Vec<&dyn rusqlite::types::ToSql> = realm_ids
+            let params: Vec<&dyn rusqlite::types::ToSql> = project_ids
                 .iter()
                 .map(|s| s as &dyn rusqlite::types::ToSql)
                 .collect();
@@ -1206,10 +1206,10 @@ impl Database {
         Ok(count)
     }
 
-    /// Save .hermes/context.json config for a realm
+    /// Save .hermes/context.json config for a project
     pub fn save_hermes_config(
         &self,
-        realm_id: &str,
+        project_id: &str,
         config_json: &str,
         config_hash: &str,
     ) -> Result<(), String> {
@@ -1221,16 +1221,16 @@ impl Database {
                 config_json = excluded.config_json,
                 config_hash = excluded.config_hash,
                 loaded_at = datetime('now')",
-                params![realm_id, config_json, config_hash],
+                params![project_id, config_json, config_hash],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    /// Get .hermes/context.json config for a realm
+    /// Get .hermes/context.json config for a project
     pub fn get_hermes_config(
         &self,
-        realm_id: &str,
+        project_id: &str,
     ) -> Result<Option<(String, Option<String>)>, String> {
         let mut stmt = self
             .conn
@@ -1239,7 +1239,7 @@ impl Database {
             )
             .map_err(|e| e.to_string())?;
         let result = stmt
-            .query_row(params![realm_id], |row| {
+            .query_row(params![project_id], |row| {
                 Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
             })
             .ok();
@@ -1404,9 +1404,9 @@ impl Database {
             .map_err(|e| e.to_string())
     }
 
-    // ─── Realm Operations ─────────────────────────────────────────
+    // ─── Project Operations ────────────────────────────────────────
 
-    pub fn insert_realm(
+    pub fn insert_project(
         &self,
         id: &str,
         path: &str,
@@ -1427,7 +1427,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn get_all_realms(&self) -> Result<Vec<crate::realm::Realm>, String> {
+    pub fn get_all_projects(&self) -> Result<Vec<crate::project::Project>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, languages, frameworks, architecture, conventions, scan_status, last_scanned_at, created_at, updated_at
              FROM realms ORDER BY updated_at DESC"
@@ -1439,7 +1439,7 @@ impl Database {
                 let frameworks_str: String = row.get(4)?;
                 let architecture_str: Option<String> = row.get(5)?;
                 let conventions_str: String = row.get(6)?;
-                Ok(crate::realm::Realm {
+                Ok(crate::project::Project {
                     id: row.get(0)?,
                     path: row.get(1)?,
                     name: row.get(2)?,
@@ -1462,7 +1462,7 @@ impl Database {
         Ok(entries)
     }
 
-    pub fn get_realm(&self, id: &str) -> Result<Option<crate::realm::Realm>, String> {
+    pub fn get_project(&self, id: &str) -> Result<Option<crate::project::Project>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, languages, frameworks, architecture, conventions, scan_status, last_scanned_at, created_at, updated_at
              FROM realms WHERE id = ?1"
@@ -1474,7 +1474,7 @@ impl Database {
                 let frameworks_str: String = row.get(4)?;
                 let architecture_str: Option<String> = row.get(5)?;
                 let conventions_str: String = row.get(6)?;
-                Ok(crate::realm::Realm {
+                Ok(crate::project::Project {
                     id: row.get(0)?,
                     path: row.get(1)?,
                     name: row.get(2)?,
@@ -1492,7 +1492,10 @@ impl Database {
         Ok(result)
     }
 
-    pub fn get_realm_by_path(&self, path: &str) -> Result<Option<crate::realm::Realm>, String> {
+    pub fn get_project_by_path(
+        &self,
+        path: &str,
+    ) -> Result<Option<crate::project::Project>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, path, name, languages, frameworks, architecture, conventions, scan_status, last_scanned_at, created_at, updated_at
              FROM realms WHERE path = ?1"
@@ -1504,7 +1507,7 @@ impl Database {
                 let frameworks_str: String = row.get(4)?;
                 let architecture_str: Option<String> = row.get(5)?;
                 let conventions_str: String = row.get(6)?;
-                Ok(crate::realm::Realm {
+                Ok(crate::project::Project {
                     id: row.get(0)?,
                     path: row.get(1)?,
                     name: row.get(2)?,
@@ -1522,7 +1525,7 @@ impl Database {
         Ok(result)
     }
 
-    pub fn update_realm_scan(
+    pub fn update_project_scan(
         &self,
         id: &str,
         scan_status: &str,
@@ -1571,7 +1574,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn delete_realm(&self, id: &str) -> Result<(), String> {
+    pub fn delete_project(&self, id: &str) -> Result<(), String> {
         self.conn
             .execute_batch("BEGIN IMMEDIATE")
             .map_err(|e| e.to_string())?;
@@ -1607,33 +1610,36 @@ impl Database {
         }
     }
 
-    pub fn attach_session_realm(
+    pub fn attach_session_project(
         &self,
         session_id: &str,
-        realm_id: &str,
+        project_id: &str,
         role: &str,
     ) -> Result<(), String> {
         self.conn
             .execute(
                 "INSERT OR IGNORE INTO session_realms (session_id, realm_id, role)
              VALUES (?1, ?2, ?3)",
-                params![session_id, realm_id, role],
+                params![session_id, project_id, role],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    pub fn detach_session_realm(&self, session_id: &str, realm_id: &str) -> Result<(), String> {
+    pub fn detach_session_project(&self, session_id: &str, project_id: &str) -> Result<(), String> {
         self.conn
             .execute(
                 "DELETE FROM session_realms WHERE session_id = ?1 AND realm_id = ?2",
-                params![session_id, realm_id],
+                params![session_id, project_id],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    pub fn get_session_realms(&self, session_id: &str) -> Result<Vec<crate::realm::Realm>, String> {
+    pub fn get_session_projects(
+        &self,
+        session_id: &str,
+    ) -> Result<Vec<crate::project::Project>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT r.id, r.path, r.name, r.languages, r.frameworks, r.architecture, r.conventions, r.scan_status, r.last_scanned_at, r.created_at, r.updated_at
              FROM realms r
@@ -1648,7 +1654,7 @@ impl Database {
                 let frameworks_str: String = row.get(4)?;
                 let architecture_str: Option<String> = row.get(5)?;
                 let conventions_str: String = row.get(6)?;
-                Ok(crate::realm::Realm {
+                Ok(crate::project::Project {
                     id: row.get(0)?,
                     path: row.get(1)?,
                     name: row.get(2)?,
@@ -1671,8 +1677,8 @@ impl Database {
         Ok(entries)
     }
 
-    /// Get realm IDs attached to a given session.
-    pub fn get_sessions_for_realm_by_session(
+    /// Get project IDs attached to a given session.
+    pub fn get_sessions_for_project_by_session(
         &self,
         session_id: &str,
     ) -> Result<Vec<String>, String> {
@@ -1692,14 +1698,14 @@ impl Database {
         Ok(entries)
     }
 
-    pub fn get_sessions_for_realm(&self, realm_id: &str) -> Result<Vec<String>, String> {
+    pub fn get_sessions_for_project(&self, project_id: &str) -> Result<Vec<String>, String> {
         let mut stmt = self
             .conn
             .prepare("SELECT session_id FROM session_realms WHERE realm_id = ?1")
             .map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(params![realm_id], |row| row.get(0))
+            .query_map(params![project_id], |row| row.get(0))
             .map_err(|e| e.to_string())?;
 
         let mut entries = Vec::new();
@@ -1711,7 +1717,7 @@ impl Database {
 
     pub fn insert_convention(
         &self,
-        realm_id: &str,
+        project_id: &str,
         rule: &str,
         source: &str,
         confidence: f64,
@@ -1722,20 +1728,23 @@ impl Database {
              VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(realm_id, rule) DO UPDATE SET
                 source = excluded.source, confidence = excluded.confidence",
-                params![realm_id, rule, source, confidence],
+                params![project_id, rule, source, confidence],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    pub fn get_conventions(&self, realm_id: &str) -> Result<Vec<crate::realm::Convention>, String> {
+    pub fn get_conventions(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<crate::project::Convention>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT rule, source, confidence FROM realm_conventions WHERE realm_id = ?1 ORDER BY confidence DESC"
         ).map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(params![realm_id], |row| {
-                Ok(crate::realm::Convention {
+            .query_map(params![project_id], |row| {
+                Ok(crate::project::Convention {
                     rule: row.get(0)?,
                     source: row.get(1)?,
                     confidence: row.get(2)?,
@@ -1794,7 +1803,7 @@ impl Database {
         &self,
         id: &str,
         session_id: &str,
-        realm_id: &str,
+        project_id: &str,
         worktree_path: &str,
         branch_name: Option<&str>,
         is_main_worktree: bool,
@@ -1802,7 +1811,7 @@ impl Database {
         self.conn.execute(
             "INSERT INTO session_worktrees (id, session_id, realm_id, worktree_path, branch_name, is_main_worktree)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![id, session_id, realm_id, worktree_path, branch_name, is_main_worktree as i32],
+            params![id, session_id, project_id, worktree_path, branch_name, is_main_worktree as i32],
         ).map_err(|e| e.to_string())?;
         Ok(())
     }
@@ -1822,7 +1831,7 @@ impl Database {
                 Ok(SessionWorktreeRow {
                     id: row.get(0)?,
                     session_id: row.get(1)?,
-                    realm_id: row.get(2)?,
+                    project_id: row.get(2)?,
                     worktree_path: row.get(3)?,
                     branch_name: row.get(4)?,
                     is_main_worktree: is_main != 0,
@@ -1838,10 +1847,10 @@ impl Database {
         Ok(entries)
     }
 
-    pub fn get_worktree_by_session_and_realm(
+    pub fn get_worktree_by_session_and_project(
         &self,
         session_id: &str,
-        realm_id: &str,
+        project_id: &str,
     ) -> Result<Option<SessionWorktreeRow>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, session_id, realm_id, worktree_path, branch_name, is_main_worktree, created_at
@@ -1849,12 +1858,12 @@ impl Database {
         ).map_err(|e| e.to_string())?;
 
         let result = stmt
-            .query_row(params![session_id, realm_id], |row| {
+            .query_row(params![session_id, project_id], |row| {
                 let is_main: i32 = row.get(5)?;
                 Ok(SessionWorktreeRow {
                     id: row.get(0)?,
                     session_id: row.get(1)?,
-                    realm_id: row.get(2)?,
+                    project_id: row.get(2)?,
                     worktree_path: row.get(3)?,
                     branch_name: row.get(4)?,
                     is_main_worktree: is_main != 0,
@@ -1865,9 +1874,9 @@ impl Database {
         Ok(result)
     }
 
-    pub fn get_worktrees_for_realm(
+    pub fn get_worktrees_for_project(
         &self,
-        realm_id: &str,
+        project_id: &str,
     ) -> Result<Vec<SessionWorktreeRow>, String> {
         let mut stmt = self.conn.prepare(
             "SELECT id, session_id, realm_id, worktree_path, branch_name, is_main_worktree, created_at
@@ -1875,12 +1884,12 @@ impl Database {
         ).map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(params![realm_id], |row| {
+            .query_map(params![project_id], |row| {
                 let is_main: i32 = row.get(5)?;
                 Ok(SessionWorktreeRow {
                     id: row.get(0)?,
                     session_id: row.get(1)?,
-                    realm_id: row.get(2)?,
+                    project_id: row.get(2)?,
                     worktree_path: row.get(3)?,
                     branch_name: row.get(4)?,
                     is_main_worktree: is_main != 0,
@@ -1918,7 +1927,7 @@ impl Database {
                 Ok(SessionWorktreeRow {
                     id: row.get(0)?,
                     session_id: row.get(1)?,
-                    realm_id: row.get(2)?,
+                    project_id: row.get(2)?,
                     worktree_path: row.get(3)?,
                     branch_name: row.get(4)?,
                     is_main_worktree: is_main != 0,
@@ -2012,12 +2021,12 @@ impl Database {
     pub fn update_worktree_last_activity(
         &self,
         session_id: &str,
-        realm_id: &str,
+        project_id: &str,
     ) -> Result<(), String> {
         self.conn
             .execute(
                 "UPDATE session_worktrees SET last_activity_at = datetime('now') WHERE session_id = ?1 AND realm_id = ?2",
-                params![session_id, realm_id],
+                params![session_id, project_id],
             )
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -2359,14 +2368,21 @@ mod tests {
     fn test_insert_and_get_session_worktrees() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/to/wt", Some("main"), false)
-            .unwrap();
+        db.insert_session_worktree(
+            "wt1",
+            "sess1",
+            "project1",
+            "/path/to/wt",
+            Some("main"),
+            false,
+        )
+        .unwrap();
 
         let rows = db.get_session_worktrees("sess1").unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].id, "wt1");
         assert_eq!(rows[0].session_id, "sess1");
-        assert_eq!(rows[0].realm_id, "realm1");
+        assert_eq!(rows[0].project_id, "project1");
         assert_eq!(rows[0].worktree_path, "/path/to/wt");
         assert_eq!(rows[0].branch_name, Some("main".to_string()));
         assert!(!rows[0].is_main_worktree);
@@ -2386,7 +2402,7 @@ mod tests {
         db.insert_session_worktree(
             "wt1",
             "sess1",
-            "realm1",
+            "project1",
             "/path/wt1",
             Some("branch-a"),
             false,
@@ -2395,7 +2411,7 @@ mod tests {
         db.insert_session_worktree(
             "wt2",
             "sess1",
-            "realm2",
+            "project2",
             "/path/wt2",
             Some("branch-b"),
             false,
@@ -2410,7 +2426,7 @@ mod tests {
     fn test_insert_main_worktree_flag() {
         let db = test_db();
 
-        db.insert_session_worktree("wt-main", "sess1", "realm1", "/repo", None, true)
+        db.insert_session_worktree("wt-main", "sess1", "project1", "/repo", None, true)
             .unwrap();
 
         let rows = db.get_session_worktrees("sess1").unwrap();
@@ -2419,55 +2435,55 @@ mod tests {
         assert!(rows[0].branch_name.is_none());
     }
 
-    // ── get_worktree_by_session_and_realm ──────────────────────────────
+    // ── get_worktree_by_session_and_project ──────────────────────────────
 
     #[test]
-    fn test_get_worktree_by_session_and_realm_found() {
+    fn test_get_worktree_by_session_and_project_found() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("main"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("main"), false)
             .unwrap();
 
         let result = db
-            .get_worktree_by_session_and_realm("sess1", "realm1")
+            .get_worktree_by_session_and_project("sess1", "project1")
             .unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().id, "wt1");
     }
 
     #[test]
-    fn test_get_worktree_by_session_and_realm_not_found() {
+    fn test_get_worktree_by_session_and_project_not_found() {
         let db = test_db();
 
         let result = db
-            .get_worktree_by_session_and_realm("sess1", "realm1")
+            .get_worktree_by_session_and_project("sess1", "project1")
             .unwrap();
         assert!(result.is_none());
     }
 
     #[test]
-    fn test_get_worktree_by_session_and_realm_wrong_session() {
+    fn test_get_worktree_by_session_and_project_wrong_session() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("main"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("main"), false)
             .unwrap();
 
         let result = db
-            .get_worktree_by_session_and_realm("sess2", "realm1")
+            .get_worktree_by_session_and_project("sess2", "project1")
             .unwrap();
         assert!(result.is_none());
     }
 
-    // ── get_worktrees_for_realm ────────────────────────────────────────
+    // ── get_worktrees_for_project ────────────────────────────────────────
 
     #[test]
-    fn test_get_worktrees_for_realm() {
+    fn test_get_worktrees_for_project() {
         let db = test_db();
 
         db.insert_session_worktree(
             "wt1",
             "sess1",
-            "realm1",
+            "project1",
             "/path/wt1",
             Some("branch-a"),
             false,
@@ -2476,7 +2492,7 @@ mod tests {
         db.insert_session_worktree(
             "wt2",
             "sess2",
-            "realm1",
+            "project1",
             "/path/wt2",
             Some("branch-b"),
             false,
@@ -2485,25 +2501,25 @@ mod tests {
         db.insert_session_worktree(
             "wt3",
             "sess3",
-            "realm2",
+            "project2",
             "/path/wt3",
             Some("branch-c"),
             false,
         )
         .unwrap();
 
-        let rows = db.get_worktrees_for_realm("realm1").unwrap();
+        let rows = db.get_worktrees_for_project("project1").unwrap();
         assert_eq!(rows.len(), 2);
 
-        let rows2 = db.get_worktrees_for_realm("realm2").unwrap();
+        let rows2 = db.get_worktrees_for_project("project2").unwrap();
         assert_eq!(rows2.len(), 1);
         assert_eq!(rows2[0].id, "wt3");
     }
 
     #[test]
-    fn test_get_worktrees_for_realm_empty() {
+    fn test_get_worktrees_for_project_empty() {
         let db = test_db();
-        let rows = db.get_worktrees_for_realm("nonexistent").unwrap();
+        let rows = db.get_worktrees_for_project("nonexistent").unwrap();
         assert!(rows.is_empty());
     }
 
@@ -2516,7 +2532,7 @@ mod tests {
         db.insert_session_worktree(
             "wt1",
             "sess1",
-            "realm1",
+            "project1",
             "/path/wt1",
             Some("old-branch"),
             false,
@@ -2526,7 +2542,7 @@ mod tests {
         db.update_worktree_branch("wt1", "new-branch").unwrap();
 
         let row = db
-            .get_worktree_by_session_and_realm("sess1", "realm1")
+            .get_worktree_by_session_and_project("sess1", "project1")
             .unwrap()
             .unwrap();
         assert_eq!(row.branch_name, Some("new-branch".to_string()));
@@ -2546,7 +2562,7 @@ mod tests {
     fn test_delete_session_worktree() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("main"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("main"), false)
             .unwrap();
 
         db.delete_session_worktree("wt1").unwrap();
@@ -2567,9 +2583,9 @@ mod tests {
     fn test_delete_session_worktree_only_deletes_target() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("a"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("a"), false)
             .unwrap();
-        db.insert_session_worktree("wt2", "sess1", "realm2", "/path/wt2", Some("b"), false)
+        db.insert_session_worktree("wt2", "sess1", "project2", "/path/wt2", Some("b"), false)
             .unwrap();
 
         db.delete_session_worktree("wt1").unwrap();
@@ -2585,11 +2601,11 @@ mod tests {
     fn test_delete_worktrees_for_session() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("a"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("a"), false)
             .unwrap();
-        db.insert_session_worktree("wt2", "sess1", "realm2", "/path/wt2", Some("b"), false)
+        db.insert_session_worktree("wt2", "sess1", "project2", "/path/wt2", Some("b"), false)
             .unwrap();
-        db.insert_session_worktree("wt3", "sess2", "realm1", "/path/wt3", Some("c"), false)
+        db.insert_session_worktree("wt3", "sess2", "project1", "/path/wt3", Some("c"), false)
             .unwrap();
 
         db.delete_worktrees_for_session("sess1").unwrap();
@@ -2614,15 +2630,15 @@ mod tests {
     // ── Unique constraints ─────────────────────────────────────────────
 
     #[test]
-    fn test_unique_session_realm_constraint() {
+    fn test_unique_session_project_constraint() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path/wt1", Some("a"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path/wt1", Some("a"), false)
             .unwrap();
 
-        // Inserting with same session_id + realm_id should fail (UNIQUE constraint)
+        // Inserting with same session_id + project_id should fail (UNIQUE constraint)
         let result =
-            db.insert_session_worktree("wt2", "sess1", "realm1", "/path/wt2", Some("b"), false);
+            db.insert_session_worktree("wt2", "sess1", "project1", "/path/wt2", Some("b"), false);
         assert!(result.is_err());
     }
 
@@ -2630,12 +2646,12 @@ mod tests {
     fn test_unique_worktree_path_constraint() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/same/path", Some("a"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/same/path", Some("a"), false)
             .unwrap();
 
         // Inserting with same worktree_path should fail (UNIQUE constraint)
         let result =
-            db.insert_session_worktree("wt2", "sess2", "realm2", "/same/path", Some("b"), false);
+            db.insert_session_worktree("wt2", "sess2", "project2", "/same/path", Some("b"), false);
         assert!(result.is_err());
     }
 
@@ -2643,12 +2659,12 @@ mod tests {
     fn test_unique_id_constraint() {
         let db = test_db();
 
-        db.insert_session_worktree("wt1", "sess1", "realm1", "/path1", Some("a"), false)
+        db.insert_session_worktree("wt1", "sess1", "project1", "/path1", Some("a"), false)
             .unwrap();
 
         // Inserting with same id should fail (PRIMARY KEY constraint)
         let result =
-            db.insert_session_worktree("wt1", "sess2", "realm2", "/path2", Some("b"), false);
+            db.insert_session_worktree("wt1", "sess2", "project2", "/path2", Some("b"), false);
         assert!(result.is_err());
     }
 }

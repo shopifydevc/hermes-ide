@@ -1,7 +1,7 @@
 /**
  * Tests for Worktree PRD Phase 1: multi-folder branch selection,
  * branch color utility, worktree detection, WorktreeIndicator component,
- * and new API bindings (listBranchesForRealms, isGitRepo).
+ * and new API bindings (listBranchesForProjects, isGitRepo).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -27,7 +27,7 @@ vi.mock("../utils/notifications", () => ({
 
 // ─── Imports ─────────────────────────────────────────────────────────
 import { invoke } from "@tauri-apps/api/core";
-import { listBranchesForRealms, isGitRepo } from "../api/git";
+import { listBranchesForProjects, isGitRepo } from "../api/git";
 
 // ─── Helpers: replicate pure logic from source ──────────────────────
 
@@ -83,25 +83,25 @@ type BranchSelections = Record<string, BranchSelection>;
 
 /**
  * Mirrors the worktree creation loop from SessionContext.tsx createSession().
- * Returns which (realmId, branchName, createBranch) tuples would be created.
+ * Returns which (projectId, branchName, createBranch) tuples would be created.
  */
 function resolveWorktreeCreations(opts: {
   projectIds?: string[];
   branchSelections?: BranchSelections;
   branchName?: string;
   createNewBranch?: boolean;
-}): Array<{ realmId: string; branch: string; createBranch: boolean }> {
-  const results: Array<{ realmId: string; branch: string; createBranch: boolean }> = [];
+}): Array<{ projectId: string; branch: string; createBranch: boolean }> {
+  const results: Array<{ projectId: string; branch: string; createBranch: boolean }> = [];
 
   if (opts.branchSelections && opts.projectIds?.length) {
-    for (const realmId of opts.projectIds) {
-      const sel = opts.branchSelections[realmId];
+    for (const projectId of opts.projectIds) {
+      const sel = opts.branchSelections[projectId];
       if (!sel) continue;
-      results.push({ realmId, branch: sel.branch, createBranch: sel.createNew });
+      results.push({ projectId, branch: sel.branch, createBranch: sel.createNew });
     }
   } else if (opts.branchName && opts.projectIds?.length) {
     results.push({
-      realmId: opts.projectIds[0],
+      projectId: opts.projectIds[0],
       branch: opts.branchName,
       createBranch: opts.createNewBranch ?? false,
     });
@@ -194,43 +194,43 @@ describe("Worktree detection", () => {
 // =====================================================================
 
 describe("Branch selections state shape", () => {
-  it("setting a branch for one realm does not affect others", () => {
+  it("setting a branch for one project does not affect others", () => {
     const selections: BranchSelections = {
-      "realm-1": { branch: "feature/login", createNew: false },
-      "realm-2": { branch: "develop", createNew: false },
+      "project-1": { branch: "feature/login", createNew: false },
+      "project-2": { branch: "develop", createNew: false },
     };
 
-    // Update realm-1 only
+    // Update project-1 only
     const updated: BranchSelections = {
       ...selections,
-      "realm-1": { branch: "feature/signup", createNew: true },
+      "project-1": { branch: "feature/signup", createNew: true },
     };
 
-    expect(updated["realm-1"].branch).toBe("feature/signup");
-    expect(updated["realm-1"].createNew).toBe(true);
-    // realm-2 unchanged
-    expect(updated["realm-2"].branch).toBe("develop");
-    expect(updated["realm-2"].createNew).toBe(false);
+    expect(updated["project-1"].branch).toBe("feature/signup");
+    expect(updated["project-1"].createNew).toBe(true);
+    // project-2 unchanged
+    expect(updated["project-2"].branch).toBe("develop");
+    expect(updated["project-2"].createNew).toBe(false);
   });
 
   it("removing a branch selection deletes the key", () => {
     const selections: BranchSelections = {
-      "realm-1": { branch: "feature/login", createNew: false },
-      "realm-2": { branch: "develop", createNew: false },
+      "project-1": { branch: "feature/login", createNew: false },
+      "project-2": { branch: "develop", createNew: false },
     };
 
     // Mimic onSkip from SessionCreator
     const next = { ...selections };
-    delete next["realm-1"];
+    delete next["project-1"];
 
-    expect(next).not.toHaveProperty("realm-1");
-    expect(next).toHaveProperty("realm-2");
+    expect(next).not.toHaveProperty("project-1");
+    expect(next).toHaveProperty("project-2");
     expect(Object.keys(next)).toHaveLength(1);
   });
 
   it("empty branchSelections means no worktrees will be created", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1", "realm-2"],
+      projectIds: ["project-1", "project-2"],
       branchSelections: {},
     });
     expect(results).toHaveLength(0);
@@ -238,7 +238,7 @@ describe("Branch selections state shape", () => {
 
   it("undefined branchSelections with no branchName means no worktrees", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1"],
+      projectIds: ["project-1"],
     });
     expect(results).toHaveLength(0);
   });
@@ -251,47 +251,47 @@ describe("Branch selections state shape", () => {
 describe("Multi-project worktree creation logic", () => {
   it("with branchSelections, createWorktree called once per git project", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1", "realm-2", "realm-3"],
+      projectIds: ["project-1", "project-2", "project-3"],
       branchSelections: {
-        "realm-1": { branch: "feature/a", createNew: false },
-        "realm-2": { branch: "feature/b", createNew: true },
-        "realm-3": { branch: "develop", createNew: false },
+        "project-1": { branch: "feature/a", createNew: false },
+        "project-2": { branch: "feature/b", createNew: true },
+        "project-3": { branch: "develop", createNew: false },
       },
     });
     expect(results).toHaveLength(3);
-    expect(results[0]).toEqual({ realmId: "realm-1", branch: "feature/a", createBranch: false });
-    expect(results[1]).toEqual({ realmId: "realm-2", branch: "feature/b", createBranch: true });
-    expect(results[2]).toEqual({ realmId: "realm-3", branch: "develop", createBranch: false });
+    expect(results[0]).toEqual({ projectId: "project-1", branch: "feature/a", createBranch: false });
+    expect(results[1]).toEqual({ projectId: "project-2", branch: "feature/b", createBranch: true });
+    expect(results[2]).toEqual({ projectId: "project-3", branch: "develop", createBranch: false });
   });
 
   it("non-git projects (no entry in branchSelections) are skipped", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-git-1", "realm-nogit", "realm-git-2"],
+      projectIds: ["project-git-1", "project-nogit", "project-git-2"],
       branchSelections: {
-        "realm-git-1": { branch: "feature/x", createNew: false },
-        "realm-git-2": { branch: "main", createNew: false },
-        // realm-nogit has no entry
+        "project-git-1": { branch: "feature/x", createNew: false },
+        "project-git-2": { branch: "main", createNew: false },
+        // project-nogit has no entry
       },
     });
     expect(results).toHaveLength(2);
-    expect(results.map((r) => r.realmId)).toEqual(["realm-git-1", "realm-git-2"]);
+    expect(results.map((r) => r.projectId)).toEqual(["project-git-1", "project-git-2"]);
   });
 
   it("legacy single branchName falls back to projectIds[0]", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1", "realm-2"],
+      projectIds: ["project-1", "project-2"],
       branchName: "feature/legacy",
       createNewBranch: false,
     });
     expect(results).toHaveLength(1);
-    expect(results[0]).toEqual({ realmId: "realm-1", branch: "feature/legacy", createBranch: false });
+    expect(results[0]).toEqual({ projectId: "project-1", branch: "feature/legacy", createBranch: false });
   });
 
   it("branchSelections takes priority over legacy branchName", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1", "realm-2"],
+      projectIds: ["project-1", "project-2"],
       branchSelections: {
-        "realm-1": { branch: "feature/new-style", createNew: true },
+        "project-1": { branch: "feature/new-style", createNew: true },
       },
       branchName: "feature/old-style",
       createNewBranch: false,
@@ -304,33 +304,33 @@ describe("Multi-project worktree creation logic", () => {
 
   it("project order does not affect which worktrees are created", () => {
     const selectionsMap: BranchSelections = {
-      "realm-a": { branch: "branch-a", createNew: false },
-      "realm-c": { branch: "branch-c", createNew: true },
+      "project-a": { branch: "branch-a", createNew: false },
+      "project-c": { branch: "branch-c", createNew: true },
     };
 
     const order1 = resolveWorktreeCreations({
-      projectIds: ["realm-a", "realm-b", "realm-c"],
+      projectIds: ["project-a", "project-b", "project-c"],
       branchSelections: selectionsMap,
     });
 
     const order2 = resolveWorktreeCreations({
-      projectIds: ["realm-c", "realm-b", "realm-a"],
+      projectIds: ["project-c", "project-b", "project-a"],
       branchSelections: selectionsMap,
     });
 
-    // Same set of realm IDs should appear (possibly in different order)
-    const set1 = new Set(order1.map((r) => r.realmId));
-    const set2 = new Set(order2.map((r) => r.realmId));
+    // Same set of project IDs should appear (possibly in different order)
+    const set1 = new Set(order1.map((r) => r.projectId));
+    const set2 = new Set(order2.map((r) => r.projectId));
     expect(set1).toEqual(set2);
     expect(set1.size).toBe(2);
-    expect(set1.has("realm-a")).toBe(true);
-    expect(set1.has("realm-c")).toBe(true);
-    expect(set1.has("realm-b")).toBe(false);
+    expect(set1.has("project-a")).toBe(true);
+    expect(set1.has("project-c")).toBe(true);
+    expect(set1.has("project-b")).toBe(false);
   });
 
   it("legacy createNewBranch defaults to false when omitted", () => {
     const results = resolveWorktreeCreations({
-      projectIds: ["realm-1"],
+      projectIds: ["project-1"],
       branchName: "feature/test",
     });
     expect(results).toHaveLength(1);
@@ -341,7 +341,7 @@ describe("Multi-project worktree creation logic", () => {
     const results = resolveWorktreeCreations({
       projectIds: [],
       branchSelections: {
-        "realm-1": { branch: "feature/x", createNew: false },
+        "project-1": { branch: "feature/x", createNew: false },
       },
     });
     expect(results).toHaveLength(0);
@@ -431,59 +431,59 @@ describe("WorktreeIndicator component logic", () => {
 // Group 6: API bindings
 // =====================================================================
 
-describe("API bindings - listBranchesForRealms", () => {
-  it("invokes correct IPC command with realmIds", async () => {
+describe("API bindings - listBranchesForProjects", () => {
+  it("invokes correct IPC command with projectIds", async () => {
     vi.mocked(invoke).mockResolvedValue({
-      "realm-1": [{ name: "main", is_current: true, is_remote: false }],
-      "realm-2": [{ name: "develop", is_current: false, is_remote: false }],
+      "project-1": [{ name: "main", is_current: true, is_remote: false }],
+      "project-2": [{ name: "develop", is_current: false, is_remote: false }],
     });
-    const result = await listBranchesForRealms(["realm-1", "realm-2"]);
-    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_realms", {
-      realmIds: ["realm-1", "realm-2"],
+    const result = await listBranchesForProjects(["project-1", "project-2"]);
+    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_projects", {
+      projectIds: ["project-1", "project-2"],
     });
-    expect(result).toHaveProperty("realm-1");
-    expect(result).toHaveProperty("realm-2");
+    expect(result).toHaveProperty("project-1");
+    expect(result).toHaveProperty("project-2");
   });
 
-  it("handles empty realmIds array", async () => {
+  it("handles empty projectIds array", async () => {
     vi.mocked(invoke).mockResolvedValue({});
-    const result = await listBranchesForRealms([]);
-    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_realms", {
-      realmIds: [],
+    const result = await listBranchesForProjects([]);
+    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_projects", {
+      projectIds: [],
     });
     expect(Object.keys(result)).toHaveLength(0);
   });
 
-  it("handles single realmId", async () => {
+  it("handles single projectId", async () => {
     vi.mocked(invoke).mockResolvedValue({
-      "realm-1": [
+      "project-1": [
         { name: "main", is_current: true, is_remote: false },
         { name: "develop", is_current: false, is_remote: false },
       ],
     });
-    const result = await listBranchesForRealms(["realm-1"]);
-    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_realms", {
-      realmIds: ["realm-1"],
+    const result = await listBranchesForProjects(["project-1"]);
+    expect(invoke).toHaveBeenCalledWith("git_list_branches_for_projects", {
+      projectIds: ["project-1"],
     });
-    expect(result["realm-1"]).toHaveLength(2);
+    expect(result["project-1"]).toHaveLength(2);
   });
 });
 
 describe("API bindings - isGitRepo", () => {
-  it("invokes correct IPC command with realmId", async () => {
+  it("invokes correct IPC command with projectId", async () => {
     vi.mocked(invoke).mockResolvedValue(true);
-    const result = await isGitRepo("realm-1");
+    const result = await isGitRepo("project-1");
     expect(invoke).toHaveBeenCalledWith("git_is_git_repo", {
-      realmId: "realm-1",
+      projectId: "project-1",
     });
     expect(result).toBe(true);
   });
 
   it("returns false for non-git repo", async () => {
     vi.mocked(invoke).mockResolvedValue(false);
-    const result = await isGitRepo("realm-no-git");
+    const result = await isGitRepo("project-no-git");
     expect(invoke).toHaveBeenCalledWith("git_is_git_repo", {
-      realmId: "realm-no-git",
+      projectId: "project-no-git",
     });
     expect(result).toBe(false);
   });

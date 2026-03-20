@@ -53,30 +53,30 @@ fn validate_worktree_path(path: &str) -> Result<std::path::PathBuf, String> {
     }
 }
 
-/// Resolves the worktree path for a given session+realm from the database.
-/// Falls back to looking up the realm's path directly if no worktree entry exists.
+/// Resolves the worktree path for a given session+project from the database.
+/// Falls back to looking up the project's path directly if no worktree entry exists.
 fn resolve_worktree_path(
     db: &Database,
     session_id: &str,
-    realm_id: &str,
+    project_id: &str,
 ) -> Result<String, String> {
-    // Try to find a worktree entry for this session+realm
+    // Try to find a worktree entry for this session+project
     if let Some(wt) = db
-        .get_worktree_by_session_and_realm(session_id, realm_id)
+        .get_worktree_by_session_and_project(session_id, project_id)
         .map_err(|e| format!("Failed to look up worktree: {}", e))?
     {
         return Ok(wt.worktree_path);
     }
-    // Fallback: look up the realm's path directly
-    if let Some(realm) = db
-        .get_realm(realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
+    // Fallback: look up the project's path directly
+    if let Some(project) = db
+        .get_project(project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
     {
-        return Ok(realm.path);
+        return Ok(project.path);
     }
     Err(format!(
-        "No worktree or realm found for session={}, realm={}",
-        session_id, realm_id
+        "No worktree or project found for session={}, project={}",
+        session_id, project_id
     ))
 }
 
@@ -520,10 +520,10 @@ pub fn git_status(
     session_id: String,
 ) -> Result<GitSessionStatus, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    let realms = db.get_session_realms(&session_id)?;
+    let session_projects = db.get_session_projects(&session_id)?;
 
-    // Resolve worktree paths for each realm
-    let projects: Vec<GitProjectStatus> = realms
+    // Resolve worktree paths for each project
+    let projects: Vec<GitProjectStatus> = session_projects
         .iter()
         .map(|r| {
             let path =
@@ -549,14 +549,14 @@ pub fn git_status(
 pub fn git_stage(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     paths: Vec<String>,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let mut index = repo.index().map_err(|e| e.to_string())?;
@@ -596,14 +596,14 @@ pub fn git_stage(
 pub fn git_unstage(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     paths: Vec<String>,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -629,7 +629,7 @@ pub fn git_unstage(
 pub fn git_commit(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     message: String,
     author_name: Option<String>,
     author_email: Option<String>,
@@ -638,7 +638,7 @@ pub fn git_commit(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -678,14 +678,14 @@ pub fn git_commit(
 pub fn git_push(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     remote: Option<String>,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let remote_name = remote.as_deref().unwrap_or("origin");
@@ -718,14 +718,14 @@ pub fn git_push(
 pub fn git_pull(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     remote: Option<String>,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -863,7 +863,7 @@ pub fn git_pull(
 pub fn git_diff(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
     staged: bool,
 ) -> Result<GitDiff, String> {
@@ -871,7 +871,7 @@ pub fn git_diff(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -937,14 +937,14 @@ pub fn git_diff(
 pub fn git_open_file(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
 ) -> Result<(), String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     // 1F: Path traversal guard
     let full_path = safe_join(&project_path, &file_path)?;
@@ -955,14 +955,14 @@ pub fn git_open_file(
 pub fn read_file_content(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
 ) -> Result<FileContent, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
 
     let full_path = safe_join(&project_path, &file_path)?;
@@ -1051,13 +1051,13 @@ pub fn read_file_content(
 pub fn open_file_in_editor(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
     editor: Option<String>,
 ) -> Result<(), String> {
     // SSH remote editors: editor string contains args (e.g. "code --remote ssh-remote+user@host")
     // or file_path is a URI (e.g. "ssh://user@host/path") — skip local path resolution.
-    if realm_id == "__ssh_local__" {
+    if project_id == "__ssh_local__" {
         return match editor {
             Some(ref cmd) if !cmd.is_empty() => {
                 // Split "code --remote ssh-remote+user@host" into command + args
@@ -1088,7 +1088,7 @@ pub fn open_file_in_editor(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
 
     let full_path = safe_join(&project_path, &file_path)?;
@@ -1130,13 +1130,13 @@ pub fn open_file_in_editor(
 pub fn git_list_branches(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<Vec<GitBranch>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let mut branches = Vec::new();
@@ -1242,22 +1242,22 @@ pub fn git_list_branches(
     Ok(branches)
 }
 
-/// List branches for a realm without requiring a session.
-/// Uses the realm's root path directly (not a worktree path).
+/// List branches for a project without requiring a session.
+/// Uses the project's root path directly (not a worktree path).
 #[tauri::command]
-pub fn git_list_branches_for_realm(
+pub fn git_list_branches_for_project(
     state: State<'_, AppState>,
-    realm_id: String,
+    project_id: String,
 ) -> Result<Vec<GitBranch>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let realm = db
-        .get_realm(&realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
-        .ok_or_else(|| format!("Realm '{}' not found", realm_id))?;
-    let project_path = realm.path.clone();
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
+    let project_path = project.path.clone();
     drop(db);
 
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
@@ -1368,13 +1368,13 @@ pub fn git_list_branches_for_realm(
 pub fn git_branches_ahead_behind(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<HashMap<String, (u32, u32)>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let mut result = HashMap::new();
@@ -1414,7 +1414,7 @@ pub fn git_branches_ahead_behind(
 pub fn git_create_branch(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     name: String,
     checkout: bool,
 ) -> Result<GitOperationResult, String> {
@@ -1422,7 +1422,7 @@ pub fn git_create_branch(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1457,28 +1457,28 @@ pub fn git_checkout_branch(
     app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     name: String,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
 
     // Validate that the branch isn't in use by another worktree
-    let realm_path = {
+    let root_path = {
         let db = state
             .db
             .lock()
             .map_err(|e| format!("DB lock error: {}", e))?;
-        db.get_realm(&realm_id)
-            .map_err(|e| format!("Failed to look up realm: {}", e))?
+        db.get_project(&project_id)
+            .map_err(|e| format!("Failed to look up project: {}", e))?
             .map(|r| r.path)
             .unwrap_or_else(|| project_path.clone())
     };
-    if !worktree::is_branch_available(&realm_path, &name, Some(&project_path)).unwrap_or(true) {
+    if !worktree::is_branch_available(&root_path, &name, Some(&project_path)).unwrap_or(true) {
         return Err(format!(
             "Branch '{}' is already checked out in another worktree. Cannot switch to it.",
             name
@@ -1560,7 +1560,7 @@ pub fn git_checkout_branch(
 pub fn git_delete_branch(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     name: String,
     force: bool,
 ) -> Result<GitOperationResult, String> {
@@ -1568,7 +1568,7 @@ pub fn git_delete_branch(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1614,14 +1614,14 @@ pub fn git_delete_branch(
 pub fn list_directory(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     relative_path: Option<String>,
 ) -> Result<Vec<FileEntry>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let base =
         std::fs::canonicalize(&project_path).map_err(|e| format!("Invalid project path: {}", e))?;
@@ -1770,13 +1770,13 @@ fn parse_stash_branch(message: &str) -> String {
 pub fn git_stash_list(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<Vec<GitStashEntry>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1813,7 +1813,7 @@ pub fn git_stash_list(
 pub fn git_stash_save(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     message: Option<String>,
     include_untracked: Option<bool>,
 ) -> Result<GitOperationResult, String> {
@@ -1821,7 +1821,7 @@ pub fn git_stash_save(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1846,14 +1846,14 @@ pub fn git_stash_save(
 pub fn git_stash_apply(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     index: usize,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1872,14 +1872,14 @@ pub fn git_stash_apply(
 pub fn git_stash_pop(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     index: usize,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1898,14 +1898,14 @@ pub fn git_stash_pop(
 pub fn git_stash_drop(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     index: usize,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -1923,13 +1923,13 @@ pub fn git_stash_drop(
 pub fn git_stash_clear(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -2004,7 +2004,7 @@ pub struct GitCommitDetail {
 pub fn git_log(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     limit: Option<usize>,
     offset: Option<usize>,
 ) -> Result<GitLogResult, String> {
@@ -2012,7 +2012,7 @@ pub fn git_log(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let limit = limit.unwrap_or(50);
@@ -2070,14 +2070,14 @@ pub fn git_log(
 pub fn git_commit_detail(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     commit_hash: String,
 ) -> Result<GitCommitDetail, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let oid =
@@ -2202,13 +2202,13 @@ pub struct ConflictContent {
 pub fn git_merge_status(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<MergeStatus, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -2314,14 +2314,14 @@ pub fn git_merge_status(
 pub fn git_get_conflict_content(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
 ) -> Result<ConflictContent, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let index = repo.index().map_err(|e| e.to_string())?;
@@ -2396,7 +2396,7 @@ pub fn git_get_conflict_content(
 pub fn git_resolve_conflict(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     file_path: String,
     strategy: String,
     manual_content: Option<String>,
@@ -2405,7 +2405,7 @@ pub fn git_resolve_conflict(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
     let full_path = safe_join(&project_path, &file_path)?;
@@ -2467,13 +2467,13 @@ pub fn git_resolve_conflict(
 pub fn git_abort_merge(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -2503,7 +2503,7 @@ pub fn git_abort_merge(
 pub fn git_continue_merge(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     message: Option<String>,
     author_name: Option<String>,
     author_email: Option<String>,
@@ -2512,7 +2512,7 @@ pub fn git_continue_merge(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
 
@@ -2604,7 +2604,7 @@ pub struct SearchResponse {
 pub fn search_project(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     query: String,
     is_regex: bool,
     case_sensitive: bool,
@@ -2614,7 +2614,7 @@ pub fn search_project(
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
     let cap = max_results.unwrap_or(500) as usize;
 
@@ -2736,7 +2736,7 @@ pub fn git_create_worktree(
     app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     branch_name: String,
     create_branch: bool,
 ) -> Result<worktree::WorktreeCreateResult, String> {
@@ -2746,27 +2746,27 @@ pub fn git_create_worktree(
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
-    // 1. Get realm path from DB
+    // 1. Get project path from DB
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let realm = db
-        .get_realm(&realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
-        .ok_or_else(|| format!("Realm '{}' not found", realm_id))?;
-    let realm_path = realm.path.clone();
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
+    let root_path = project.path.clone();
     drop(db);
 
     // Journal: log the CREATE operation before performing it
     let intended_path =
-        worktree::worktree_path_for_session(&app_data_dir, &realm_path, &session_id, &branch_name);
+        worktree::worktree_path_for_session(&app_data_dir, &root_path, &session_id, &branch_name);
     let _ = journal::log_operation(
         &app_data_dir,
-        &realm_path,
+        &root_path,
         "CREATE",
         &session_id,
-        &realm_id,
+        &project_id,
         &branch_name,
         &intended_path.to_string_lossy(),
     );
@@ -2774,7 +2774,7 @@ pub fn git_create_worktree(
     // 2. Create the worktree
     let result = worktree::create_worktree(
         &app_data_dir,
-        &realm_path,
+        &root_path,
         &session_id,
         &branch_name,
         create_branch,
@@ -2789,7 +2789,7 @@ pub fn git_create_worktree(
     if let Err(db_err) = db.insert_session_worktree(
         &id,
         &session_id,
-        &realm_id,
+        &project_id,
         &result.worktree_path,
         Some(&result.branch_name),
         result.is_main_worktree,
@@ -2797,17 +2797,23 @@ pub fn git_create_worktree(
         // Rollback: remove the worktree we just created
         log::warn!("DB insert failed for worktree, rolling back: {}", db_err);
         if !result.is_main_worktree {
-            let _ = worktree::remove_worktree(&realm_path, &session_id, &result.worktree_path);
+            let _ = worktree::remove_worktree(&root_path, &session_id, &result.worktree_path);
         }
         return Err(format!("Failed to record worktree: {}", db_err));
     }
     drop(db);
 
     // Journal: mark CREATE as completed after successful creation + DB insert
-    let _ = journal::log_completed(&app_data_dir, &realm_path, "CREATE", &session_id, &realm_id);
+    let _ = journal::log_completed(
+        &app_data_dir,
+        &root_path,
+        "CREATE",
+        &session_id,
+        &project_id,
+    );
 
     // 4. Emit event for frontend
-    let _ = app.emit(&format!("worktree-created-{}", realm_id), &result);
+    let _ = app.emit(&format!("worktree-created-{}", project_id), &result);
 
     // 5. Return result
     Ok(result)
@@ -2818,7 +2824,7 @@ pub fn git_remove_worktree(
     app: AppHandle,
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<GitOperationResult, String> {
     // 1. Look up worktree from DB
     let db = state
@@ -2826,21 +2832,21 @@ pub fn git_remove_worktree(
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
     let wt = db
-        .get_worktree_by_session_and_realm(&session_id, &realm_id)
+        .get_worktree_by_session_and_project(&session_id, &project_id)
         .map_err(|e| format!("Failed to look up worktree: {}", e))?
         .ok_or_else(|| {
             format!(
-                "No worktree found for session={}, realm={}",
-                session_id, realm_id
+                "No worktree found for session={}, project={}",
+                session_id, project_id
             )
         })?;
-    let realm = db
-        .get_realm(&realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
-        .ok_or_else(|| format!("Realm '{}' not found", realm_id))?;
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
     let wt_id = wt.id.clone();
     let wt_path = wt.worktree_path.clone();
-    let realm_path = realm.path.clone();
+    let root_path = project.path.clone();
     let is_main = wt.is_main_worktree;
     drop(db);
 
@@ -2860,16 +2866,16 @@ pub fn git_remove_worktree(
     // Journal: log the REMOVE operation before performing it
     let _ = journal::log_operation(
         &app_data_dir,
-        &realm_path,
+        &root_path,
         "REMOVE",
         &session_id,
-        &realm_id,
+        &project_id,
         "",
         &wt_path,
     );
 
     // 2. Try to remove the worktree from the filesystem
-    let remove_result = worktree::remove_worktree(&realm_path, &session_id, &wt_path);
+    let remove_result = worktree::remove_worktree(&root_path, &session_id, &wt_path);
 
     // 3. Only delete DB record if git removal succeeded (or directory no longer exists)
     let dir_gone = !std::path::Path::new(&wt_path).is_dir();
@@ -2892,10 +2898,16 @@ pub fn git_remove_worktree(
     }
 
     // Journal: mark REMOVE as completed after successful removal + DB delete
-    let _ = journal::log_completed(&app_data_dir, &realm_path, "REMOVE", &session_id, &realm_id);
+    let _ = journal::log_completed(
+        &app_data_dir,
+        &root_path,
+        "REMOVE",
+        &session_id,
+        &project_id,
+    );
 
     // 4. Emit event for frontend
-    let _ = app.emit(&format!("worktree-removed-{}", realm_id), ());
+    let _ = app.emit(&format!("worktree-removed-{}", project_id), ());
 
     // 5. Return result
     Ok(GitOperationResult {
@@ -2908,13 +2920,13 @@ pub fn git_remove_worktree(
 #[tauri::command]
 pub fn git_list_worktrees(
     state: State<'_, AppState>,
-    realm_id: String,
+    project_id: String,
 ) -> Result<Vec<worktree::WorktreeInfo>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let worktrees = db.get_worktrees_for_realm(&realm_id)?;
+    let worktrees = db.get_worktrees_for_project(&project_id)?;
 
     let infos: Vec<worktree::WorktreeInfo> = worktrees
         .into_iter()
@@ -2932,22 +2944,22 @@ pub fn git_list_worktrees(
 #[tauri::command]
 pub fn git_check_branch_available(
     state: State<'_, AppState>,
-    realm_id: String,
+    project_id: String,
     branch_name: String,
 ) -> Result<worktree::BranchAvailability, String> {
-    // 1. Get realm path
+    // 1. Get project path
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let realm = db
-        .get_realm(&realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
-        .ok_or_else(|| format!("Realm '{}' not found", realm_id))?;
-    let realm_path = realm.path.clone();
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
+    let root_path = project.path.clone();
 
     // Check if any session worktree is using this branch
-    let worktrees = db.get_worktrees_for_realm(&realm_id)?;
+    let worktrees = db.get_worktrees_for_project(&project_id)?;
     let used_by = worktrees
         .iter()
         .find(|wt| wt.branch_name.as_deref() == Some(branch_name.as_str()));
@@ -2962,7 +2974,7 @@ pub fn git_check_branch_available(
     }
 
     // 2. Also check via git if the branch is checked out in any worktree
-    let available = worktree::is_branch_available(&realm_path, &branch_name, None)?;
+    let available = worktree::is_branch_available(&root_path, &branch_name, None)?;
 
     Ok(worktree::BranchAvailability {
         available,
@@ -2975,31 +2987,31 @@ pub fn git_check_branch_available(
 pub fn git_session_worktree_info(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<Option<crate::db::SessionWorktreeRow>, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    db.get_worktree_by_session_and_realm(&session_id, &realm_id)
+    db.get_worktree_by_session_and_project(&session_id, &project_id)
         .map_err(|e| format!("Failed to look up worktree: {}", e))
 }
 
 #[tauri::command]
-pub fn git_list_branches_for_realms(
+pub fn git_list_branches_for_projects(
     state: State<'_, AppState>,
-    realm_ids: Vec<String>,
+    project_ids: Vec<String>,
 ) -> Result<HashMap<String, Vec<GitBranch>>, String> {
-    // Collect realm paths while holding the DB lock, then drop it before git I/O
-    let realm_paths: Vec<(String, Option<String>)> = {
+    // Collect project paths while holding the DB lock, then drop it before git I/O
+    let project_paths: Vec<(String, Option<String>)> = {
         let db = state
             .db
             .lock()
             .map_err(|e| format!("DB lock error: {}", e))?;
-        realm_ids
+        project_ids
             .iter()
             .map(|id| {
-                let path = db.get_realm(id).ok().flatten().map(|r| r.path);
+                let path = db.get_project(id).ok().flatten().map(|r| r.path);
                 (id.clone(), path)
             })
             .collect()
@@ -3007,19 +3019,19 @@ pub fn git_list_branches_for_realms(
 
     let mut result: HashMap<String, Vec<GitBranch>> = HashMap::new();
 
-    for (realm_id, realm_path) in &realm_paths {
-        let realm_path = match realm_path {
+    for (project_id, project_path) in &project_paths {
+        let project_path = match project_path {
             Some(p) => p,
             None => {
-                result.insert(realm_id.clone(), Vec::new());
+                result.insert(project_id.clone(), Vec::new());
                 continue;
             }
         };
 
-        let repo = match Repository::open(realm_path) {
+        let repo = match Repository::open(project_path) {
             Ok(r) => r,
             Err(_) => {
-                result.insert(realm_id.clone(), Vec::new());
+                result.insert(project_id.clone(), Vec::new());
                 continue;
             }
         };
@@ -3080,25 +3092,25 @@ pub fn git_list_branches_for_realms(
             }
         }
 
-        result.insert(realm_id.clone(), branches);
+        result.insert(project_id.clone(), branches);
     }
 
     Ok(result)
 }
 
 #[tauri::command]
-pub fn git_is_git_repo(state: State<'_, AppState>, realm_id: String) -> Result<bool, String> {
+pub fn git_is_git_repo(state: State<'_, AppState>, project_id: String) -> Result<bool, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let realm = db
-        .get_realm(&realm_id)
-        .map_err(|e| format!("Failed to look up realm: {}", e))?
-        .ok_or_else(|| format!("Realm '{}' not found", realm_id))?;
+    let project = db
+        .get_project(&project_id)
+        .map_err(|e| format!("Failed to look up project: {}", e))?
+        .ok_or_else(|| format!("Project '{}' not found", project_id))?;
     drop(db);
 
-    Ok(Repository::open(&realm.path).is_ok())
+    Ok(Repository::open(&project.path).is_ok())
 }
 
 // ─── Worktree Dirty Detection & Stash ───────────────────────────────
@@ -3133,13 +3145,13 @@ fn map_status_flags(s: git2::Status) -> &'static str {
 pub fn git_worktree_has_changes(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
 ) -> Result<WorktreeChanges, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
 
     let repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
@@ -3174,14 +3186,14 @@ pub fn git_worktree_has_changes(
 pub fn git_stash_worktree(
     state: State<'_, AppState>,
     session_id: String,
-    realm_id: String,
+    project_id: String,
     message: Option<String>,
 ) -> Result<GitOperationResult, String> {
     let db = state
         .db
         .lock()
         .map_err(|e| format!("DB lock error: {}", e))?;
-    let project_path = resolve_worktree_path(&db, &session_id, &realm_id)?;
+    let project_path = resolve_worktree_path(&db, &session_id, &project_id)?;
     drop(db);
 
     let mut repo = Repository::open(&project_path).map_err(|e| e.to_string())?;
@@ -3207,9 +3219,9 @@ pub struct WorktreeOverviewEntry {
     pub branch_name: Option<String>,
     pub session_id: String,
     pub session_label: String,
-    pub realm_id: String,
-    pub realm_name: String,
-    pub realm_path: String,
+    pub project_id: String,
+    pub project_name: String,
+    pub root_path: String,
     pub is_main_worktree: bool,
     pub created_at: String,
     pub last_activity_at: Option<String>,
@@ -3220,7 +3232,7 @@ pub struct OrphanWorktree {
     pub worktree_path: String,
     pub branch_name: Option<String>,
     pub kind: String, // "directory_only" or "record_only"
-    pub realm_path: Option<String>,
+    pub root_path: Option<String>,
     pub session_id: Option<String>,
 }
 
@@ -3236,7 +3248,7 @@ pub fn git_list_all_worktrees(
     state: State<'_, AppState>,
 ) -> Result<Vec<WorktreeOverviewEntry>, String> {
     // 1. Collect all DB data while holding the lock
-    let (all_worktrees, realm_map) = {
+    let (all_worktrees, project_map) = {
         let db = state
             .db
             .lock()
@@ -3244,16 +3256,17 @@ pub fn git_list_all_worktrees(
 
         let worktrees = db.get_all_session_worktrees()?;
 
-        // Collect unique realm IDs and look up realm info
-        let realm_ids: HashSet<String> = worktrees.iter().map(|wt| wt.realm_id.clone()).collect();
-        let mut realms: HashMap<String, crate::realm::Realm> = HashMap::new();
-        for realm_id in &realm_ids {
-            if let Ok(Some(realm)) = db.get_realm(realm_id) {
-                realms.insert(realm_id.clone(), realm);
+        // Collect unique project IDs and look up project info
+        let project_ids: HashSet<String> =
+            worktrees.iter().map(|wt| wt.project_id.clone()).collect();
+        let mut projects: HashMap<String, crate::project::Project> = HashMap::new();
+        for project_id in &project_ids {
+            if let Ok(Some(project)) = db.get_project(project_id) {
+                projects.insert(project_id.clone(), project);
             }
         }
 
-        (worktrees, realms)
+        (worktrees, projects)
     };
     // DB lock is dropped here
 
@@ -3285,8 +3298,8 @@ pub fn git_list_all_worktrees(
                 .cloned()
                 .unwrap_or_else(|| format!("Session {}", &wt.session_id[..label_prefix_len]));
 
-            let (realm_name, realm_path) = realm_map
-                .get(&wt.realm_id)
+            let (project_name, root_path) = project_map
+                .get(&wt.project_id)
                 .map(|r| (r.name.clone(), r.path.clone()))
                 .unwrap_or_else(|| ("Unknown".to_string(), String::new()));
 
@@ -3295,9 +3308,9 @@ pub fn git_list_all_worktrees(
                 branch_name: wt.branch_name,
                 session_id: wt.session_id,
                 session_label,
-                realm_id: wt.realm_id,
-                realm_name,
-                realm_path,
+                project_id: wt.project_id,
+                project_name,
+                root_path,
                 is_main_worktree: wt.is_main_worktree,
                 created_at: wt.created_at,
                 last_activity_at: None,
@@ -3319,15 +3332,15 @@ pub fn git_detect_orphan_worktrees(
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
 
     // 1. Collect all DB data while holding the lock
-    let (all_records, realms) = {
+    let (all_records, projects) = {
         let db = state
             .db
             .lock()
             .map_err(|e| format!("DB lock error: {}", e))?;
 
         let records = db.get_all_session_worktrees().unwrap_or_default();
-        let realms = db.get_all_realms().unwrap_or_default();
-        (records, realms)
+        let projects = db.get_all_projects().unwrap_or_default();
+        (records, projects)
     };
     // DB lock is dropped here
 
@@ -3350,16 +3363,16 @@ pub fn git_detect_orphan_worktrees(
                 worktree_path: record.worktree_path.clone(),
                 branch_name: record.branch_name.clone(),
                 kind: "record_only".to_string(),
-                realm_path: None,
+                root_path: None,
                 session_id: Some(record.session_id.clone()),
             });
         }
     }
 
     // 3. Check for "directory_only" — directory exists but no DB record
-    //    Scan each realm's worktree hash directory in the app data dir
-    for realm in &realms {
-        let wt_dir = worktree::worktree_dir(&app_data_dir, &realm.path);
+    //    Scan each project's worktree hash directory in the app data dir
+    for project in &projects {
+        let wt_dir = worktree::worktree_dir(&app_data_dir, &project.path);
         if wt_dir.is_dir() {
             if let Ok(entries) = std::fs::read_dir(&wt_dir) {
                 for entry in entries.flatten() {
@@ -3381,7 +3394,7 @@ pub fn git_detect_orphan_worktrees(
                             worktree_path: path_str,
                             branch_name: branch,
                             kind: "directory_only".to_string(),
-                            realm_path: Some(realm.path.clone()),
+                            root_path: Some(project.path.clone()),
                             session_id: None,
                         });
                     }

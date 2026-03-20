@@ -46,7 +46,7 @@ export function GitPanel({ visible }: GitPanelProps) {
     if (workDir) refreshGitStatus(workDir);
   }, [workDir]);
   const error = null; // errors are silently ignored in the shared cache
-  const [diffTarget, setDiffTarget] = useState<{ sessionId: string; realmId: string; file: GitFile } | null>(null);
+  const [diffTarget, setDiffTarget] = useState<{ sessionId: string; projectId: string; file: GitFile } | null>(null);
   const [toast, setToast] = useState<GitToast | null>(null);
   const [panelView, setPanelView] = useState<GitPanelView>("changes");
 
@@ -75,8 +75,8 @@ export function GitPanel({ visible }: GitPanelProps) {
     setToast({ message, type });
   }, []);
 
-  const handleDiffFile = useCallback((sessionId: string, realmId: string, file: GitFile) => {
-    setDiffTarget({ sessionId, realmId, file });
+  const handleDiffFile = useCallback((sessionId: string, projectId: string, file: GitFile) => {
+    setDiffTarget({ sessionId, projectId, file });
   }, []);
 
   return (
@@ -131,7 +131,7 @@ export function GitPanel({ visible }: GitPanelProps) {
             <GitProjectSection
               key={project.project_id}
               sessionId={state.activeSessionId!}
-              realmId={project.project_id}
+              projectId={project.project_id}
               project={project}
               onRefresh={refresh}
               onDiffFile={handleDiffFile}
@@ -160,7 +160,7 @@ export function GitPanel({ visible }: GitPanelProps) {
       {diffTarget && (
         <GitDiffView
           sessionId={diffTarget.sessionId}
-          realmId={diffTarget.realmId}
+          projectId={diffTarget.projectId}
           file={diffTarget.file}
           onClose={() => setDiffTarget(null)}
         />

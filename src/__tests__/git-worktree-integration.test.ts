@@ -88,7 +88,7 @@ describe("Session creation with worktree", () => {
     };
     vi.mocked(invoke).mockResolvedValue(createResult);
 
-    const result = await createWorktree("session-2", "realm-1", "feature/login", true);
+    const result = await createWorktree("session-2", "project-1", "feature/login", true);
     expect(result.worktreePath).toBe("/repos/.worktrees/feature-login");
     expect(result.branchName).toBe("feature/login");
     expect(result.isMainWorktree).toBe(false);
@@ -102,7 +102,7 @@ describe("Session creation with worktree", () => {
     };
     vi.mocked(invoke).mockResolvedValue(createResult);
 
-    const result = await createWorktree("session-1", "realm-1", "main", false);
+    const result = await createWorktree("session-1", "project-1", "main", false);
     expect(result.isMainWorktree).toBe(true);
   });
 
@@ -114,7 +114,7 @@ describe("Session creation with worktree", () => {
     };
     vi.mocked(invoke).mockResolvedValue(createResult);
 
-    const result = await createWorktree("session-2", "realm-1", "develop", false);
+    const result = await createWorktree("session-2", "project-1", "develop", false);
     expect(result.isMainWorktree).toBe(false);
     expect(result.worktreePath).not.toBe("/repos/myproject"); // different path
   });
@@ -124,18 +124,18 @@ describe("Session destruction with worktree", () => {
   it("removeWorktree cleans up worktree on session close", async () => {
     vi.mocked(invoke).mockResolvedValue({ success: true, message: "Worktree removed", error: null });
 
-    const result = await removeWorktree("session-2", "realm-1");
+    const result = await removeWorktree("session-2", "project-1");
     expect(result.success).toBe(true);
     expect(invoke).toHaveBeenCalledWith("git_remove_worktree", {
       sessionId: "session-2",
-      realmId: "realm-1",
+      projectId: "project-1",
     });
   });
 
   it("removeWorktree fails gracefully for non-existent worktree", async () => {
     vi.mocked(invoke).mockResolvedValue({ success: false, message: "No worktree", error: "not found" });
 
-    const result = await removeWorktree("session-99", "realm-1");
+    const result = await removeWorktree("session-99", "project-1");
     expect(result.success).toBe(false);
     expect(result.error).toBe("not found");
   });
@@ -152,12 +152,12 @@ describe("Branch checkout validates availability first", () => {
       branchName: "feature/x",
     } satisfies BranchAvailability);
 
-    const availability = await checkBranchAvailable("realm-1", "feature/x");
+    const availability = await checkBranchAvailable("project-1", "feature/x");
     expect(availability.available).toBe(true);
 
     // Then checkout
     vi.mocked(invoke).mockResolvedValueOnce({ success: true, message: "checked out", error: null });
-    const result = await gitCheckoutBranch("s1", "realm-1", "feature/x");
+    const result = await gitCheckoutBranch("s1", "project-1", "feature/x");
     expect(result.success).toBe(true);
   });
 
@@ -168,7 +168,7 @@ describe("Branch checkout validates availability first", () => {
       branchName: "feature/x",
     } satisfies BranchAvailability);
 
-    const availability = await checkBranchAvailable("realm-1", "feature/x");
+    const availability = await checkBranchAvailable("project-1", "feature/x");
     expect(availability.available).toBe(false);
     expect(availability.usedBySession).toBe("session-2");
   });
@@ -182,7 +182,7 @@ describe("Branch checkout validates availability first", () => {
         branchName: "develop",
       } satisfies BranchAvailability);
 
-    const availability = await checkBranchAvailable("realm-1", "develop");
+    const availability = await checkBranchAvailable("project-1", "develop");
 
     // If unavailable, do NOT proceed with checkout
     if (!availability.available) {
@@ -227,7 +227,7 @@ describe("Multiple sessions on same repo get different worktree paths", () => {
 
     vi.mocked(invoke).mockResolvedValue(worktrees);
 
-    const result = await listWorktrees("realm-1");
+    const result = await listWorktrees("project-1");
     expect(result).toHaveLength(3);
 
     // All sessions have unique paths
@@ -248,7 +248,7 @@ describe("Multiple sessions on same repo get different worktree paths", () => {
     const session1Info: SessionWorktree = {
       id: "wt-1",
       sessionId: "session-1",
-      realmId: "realm-1",
+      projectId: "project-1",
       worktreePath: "/repos/myproject",
       branchName: "main",
       isMainWorktree: true,
@@ -258,7 +258,7 @@ describe("Multiple sessions on same repo get different worktree paths", () => {
     const session2Info: SessionWorktree = {
       id: "wt-2",
       sessionId: "session-2",
-      realmId: "realm-1",
+      projectId: "project-1",
       worktreePath: "/repos/.worktrees/develop",
       branchName: "develop",
       isMainWorktree: false,
@@ -267,13 +267,13 @@ describe("Multiple sessions on same repo get different worktree paths", () => {
 
     // Query session 1
     vi.mocked(invoke).mockResolvedValueOnce(session1Info);
-    const info1 = await getSessionWorktreeInfo("session-1", "realm-1");
+    const info1 = await getSessionWorktreeInfo("session-1", "project-1");
     expect(info1!.worktreePath).toBe("/repos/myproject");
     expect(info1!.isMainWorktree).toBe(true);
 
     // Query session 2
     vi.mocked(invoke).mockResolvedValueOnce(session2Info);
-    const info2 = await getSessionWorktreeInfo("session-2", "realm-1");
+    const info2 = await getSessionWorktreeInfo("session-2", "project-1");
     expect(info2!.worktreePath).toBe("/repos/.worktrees/develop");
     expect(info2!.isMainWorktree).toBe(false);
 
@@ -293,7 +293,7 @@ describe("Unavailable branches shown as disabled", () => {
     ];
     vi.mocked(invoke).mockResolvedValueOnce(worktrees);
 
-    const wts = await listWorktrees("realm-1");
+    const wts = await listWorktrees("project-1");
     const checkedOut = new Set(wts.map((w) => w.branchName).filter(Boolean));
 
     expect(checkedOut.has("main")).toBe(true);
@@ -321,8 +321,8 @@ describe("Unavailable branches shown as disabled", () => {
       .mockResolvedValueOnce(worktrees)
       .mockResolvedValueOnce(branches);
 
-    const wts = await listWorktrees("realm-1");
-    const brs = await gitListBranches("s1", "realm-1");
+    const wts = await listWorktrees("project-1");
+    const brs = await gitListBranches("s1", "project-1");
 
     const checkedOutBranches = new Set(wts.map((w) => w.branchName).filter(Boolean));
 
@@ -431,7 +431,7 @@ describe("Worktree edge cases", () => {
     const result = await createWorktree("s2", "r1", "existing-branch", false);
     expect(invoke).toHaveBeenCalledWith("git_create_worktree", {
       sessionId: "s2",
-      realmId: "r1",
+      projectId: "r1",
       branchName: "existing-branch",
       createBranch: false,
     });

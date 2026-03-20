@@ -13,7 +13,7 @@ export function createSession(opts: {
   color: string | null;
   workspacePaths: string[] | null;
   aiProvider: string | null;
-  realmIds: string[] | null;
+  projectIds: string[] | null;
   autoApprove?: boolean;
   sshHost?: string | null;
   sshPort?: number | null;

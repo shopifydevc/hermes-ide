@@ -65,39 +65,39 @@ function isStale(createdAt: string, daysThreshold: number = 14): boolean {
 }
 
 /**
- * Mirrors the grouping logic from WorktreeOverviewPanel.tsx (realmGroups useMemo).
+ * Mirrors the grouping logic from WorktreeOverviewPanel.tsx (projectGroups useMemo).
  */
-interface RealmGroup {
-  realmId: string;
-  realmName: string;
-  realmPath: string;
+interface ProjectGroup {
+  projectId: string;
+  projectName: string;
+  projectPath: string;
   worktrees: WorktreeOverviewEntry[];
   orphans: OrphanWorktree[];
 }
 
-function groupByRealm(worktrees: WorktreeOverviewEntry[], orphans: OrphanWorktree[]): RealmGroup[] {
-  const groupMap = new Map<string, RealmGroup>();
+function groupByProject(worktrees: WorktreeOverviewEntry[], orphans: OrphanWorktree[]): ProjectGroup[] {
+  const groupMap = new Map<string, ProjectGroup>();
 
   for (const wt of worktrees) {
-    let group = groupMap.get(wt.realm_id);
+    let group = groupMap.get(wt.project_id);
     if (!group) {
       group = {
-        realmId: wt.realm_id,
-        realmName: wt.realm_name,
-        realmPath: wt.realm_path,
+        projectId: wt.project_id,
+        projectName: wt.project_name,
+        projectPath: wt.project_path,
         worktrees: [],
         orphans: [],
       };
-      groupMap.set(wt.realm_id, group);
+      groupMap.set(wt.project_id, group);
     }
     group.worktrees.push(wt);
   }
 
   for (const orphan of orphans) {
     let placed = false;
-    if (orphan.realm_path) {
+    if (orphan.project_path) {
       for (const group of groupMap.values()) {
-        if (group.realmPath === orphan.realm_path) {
+        if (group.projectPath === orphan.project_path) {
           group.orphans.push(orphan);
           placed = true;
           break;
@@ -105,13 +105,13 @@ function groupByRealm(worktrees: WorktreeOverviewEntry[], orphans: OrphanWorktre
       }
     }
     if (!placed) {
-      const key = orphan.realm_path || orphan.worktree_path;
+      const key = orphan.project_path || orphan.worktree_path;
       let group = groupMap.get(key);
       if (!group) {
         group = {
-          realmId: key,
-          realmName: orphan.realm_path ? orphan.realm_path.split("/").pop() || "Unknown" : "Orphaned",
-          realmPath: orphan.realm_path || "",
+          projectId: key,
+          projectName: orphan.project_path ? orphan.project_path.split("/").pop() || "Unknown" : "Orphaned",
+          projectPath: orphan.project_path || "",
           worktrees: [],
           orphans: [],
         };
@@ -127,7 +127,7 @@ function groupByRealm(worktrees: WorktreeOverviewEntry[], orphans: OrphanWorktre
 /**
  * Mirrors the search/filter logic from WorktreeOverviewPanel.tsx (filteredGroups useMemo).
  */
-function filterGroups(groups: RealmGroup[], search: string): RealmGroup[] {
+function filterGroups(groups: ProjectGroup[], search: string): ProjectGroup[] {
   if (!search.trim()) return groups;
   const q = search.toLowerCase();
   return groups
@@ -137,7 +137,7 @@ function filterGroups(groups: RealmGroup[], search: string): RealmGroup[] {
         (wt) =>
           (wt.branch_name && wt.branch_name.toLowerCase().includes(q)) ||
           wt.session_label.toLowerCase().includes(q) ||
-          wt.realm_name.toLowerCase().includes(q),
+          wt.project_name.toLowerCase().includes(q),
       ),
       orphans: group.orphans.filter(
         (o) =>
@@ -156,9 +156,9 @@ function makeWorktreeEntry(overrides: Partial<WorktreeOverviewEntry> = {}): Work
     branch_name: "feature",
     session_id: "session-1",
     session_label: "Session 1",
-    realm_id: "realm-1",
-    realm_name: "my-project",
-    realm_path: "/Users/dev/project",
+    project_id: "project-1",
+    project_name: "my-project",
+    project_path: "/Users/dev/project",
     is_main_worktree: false,
     created_at: new Date().toISOString(),
     last_activity_at: null,
@@ -171,7 +171,7 @@ function makeOrphan(overrides: Partial<OrphanWorktree> = {}): OrphanWorktree {
     worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/orphan_branch",
     branch_name: "branch",
     kind: "directory_only",
-    realm_path: "/Users/dev/project",
+    project_path: "/Users/dev/project",
     session_id: null,
     ...overrides,
   };
@@ -442,111 +442,111 @@ describe("Cleanup flow", () => {
 describe("Worktree grouping", () => {
   const worktrees: WorktreeOverviewEntry[] = [
     makeWorktreeEntry({
-      realm_id: "realm-1",
-      realm_name: "frontend",
-      realm_path: "/Users/dev/frontend",
+      project_id: "project-1",
+      project_name: "frontend",
+      project_path: "/Users/dev/frontend",
       branch_name: "feature/login",
       session_label: "Login session",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/a_feature-login",
     }),
     makeWorktreeEntry({
-      realm_id: "realm-1",
-      realm_name: "frontend",
-      realm_path: "/Users/dev/frontend",
+      project_id: "project-1",
+      project_name: "frontend",
+      project_path: "/Users/dev/frontend",
       branch_name: "develop",
       session_label: "Dev session",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/b_develop",
     }),
     makeWorktreeEntry({
-      realm_id: "realm-2",
-      realm_name: "backend",
-      realm_path: "/Users/dev/backend",
+      project_id: "project-2",
+      project_name: "backend",
+      project_path: "/Users/dev/backend",
       branch_name: "main",
       session_label: "Backend main",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/c_main",
     }),
     makeWorktreeEntry({
-      realm_id: "realm-3",
-      realm_name: "api-gateway",
-      realm_path: "/Users/dev/api-gateway",
+      project_id: "project-3",
+      project_name: "api-gateway",
+      project_path: "/Users/dev/api-gateway",
       branch_name: "hotfix/auth",
       session_label: "Auth fix",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/d_hotfix-auth",
     }),
   ];
 
-  it("entries grouped by realm_id", () => {
-    const groups = groupByRealm(worktrees, []);
+  it("entries grouped by project_id", () => {
+    const groups = groupByProject(worktrees, []);
 
     expect(groups).toHaveLength(3);
 
-    const realmIds = groups.map((g) => g.realmId);
-    expect(realmIds).toContain("realm-1");
-    expect(realmIds).toContain("realm-2");
-    expect(realmIds).toContain("realm-3");
+    const projectIds = groups.map((g) => g.projectId);
+    expect(projectIds).toContain("project-1");
+    expect(projectIds).toContain("project-2");
+    expect(projectIds).toContain("project-3");
 
-    const frontendGroup = groups.find((g) => g.realmId === "realm-1")!;
+    const frontendGroup = groups.find((g) => g.projectId === "project-1")!;
     expect(frontendGroup.worktrees).toHaveLength(2);
 
-    const backendGroup = groups.find((g) => g.realmId === "realm-2")!;
+    const backendGroup = groups.find((g) => g.projectId === "project-2")!;
     expect(backendGroup.worktrees).toHaveLength(1);
 
-    const apiGroup = groups.find((g) => g.realmId === "realm-3")!;
+    const apiGroup = groups.find((g) => g.projectId === "project-3")!;
     expect(apiGroup.worktrees).toHaveLength(1);
   });
 
-  it("entries sorted by realm name", () => {
-    const groups = groupByRealm(worktrees, []);
-    const realmNames = groups.map((g) => g.realmName);
+  it("entries sorted by project name", () => {
+    const groups = groupByProject(worktrees, []);
+    const projectNames = groups.map((g) => g.projectName);
 
     // Groups preserve insertion order from worktrees array
-    // realm-1 (frontend), realm-2 (backend), realm-3 (api-gateway)
-    expect(realmNames).toEqual(["frontend", "backend", "api-gateway"]);
+    // project-1 (frontend), project-2 (backend), project-3 (api-gateway)
+    expect(projectNames).toEqual(["frontend", "backend", "api-gateway"]);
   });
 
   it("search filters by branch name", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "login");
 
     // Only the worktree with branch "feature/login" should match
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].realmId).toBe("realm-1");
+    expect(filtered[0].projectId).toBe("project-1");
     expect(filtered[0].worktrees).toHaveLength(1);
     expect(filtered[0].worktrees[0].branch_name).toBe("feature/login");
   });
 
   it("search filters by session label", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "Auth fix");
 
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].realmId).toBe("realm-3");
+    expect(filtered[0].projectId).toBe("project-3");
     expect(filtered[0].worktrees).toHaveLength(1);
     expect(filtered[0].worktrees[0].session_label).toBe("Auth fix");
   });
 
-  it("search filters by realm name", () => {
-    const groups = groupByRealm(worktrees, []);
+  it("search filters by project name", () => {
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "backend");
 
-    // "backend" matches realm_name for realm-2, and all worktrees under it match
+    // "backend" matches project_name for project-2, and all worktrees under it match
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].realmId).toBe("realm-2");
+    expect(filtered[0].projectId).toBe("project-2");
     expect(filtered[0].worktrees).toHaveLength(1);
   });
 
-  it("search filters by realm name matches all entries in that realm", () => {
-    const groups = groupByRealm(worktrees, []);
+  it("search filters by project name matches all entries in that project", () => {
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "frontend");
 
-    // "frontend" matches realm_name for realm-1, so both worktrees match
+    // "frontend" matches project_name for project-1, so both worktrees match
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].realmId).toBe("realm-1");
+    expect(filtered[0].projectId).toBe("project-1");
     expect(filtered[0].worktrees).toHaveLength(2);
   });
 
   it("empty search shows all entries", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "");
 
     expect(filtered).toHaveLength(3);
@@ -555,54 +555,54 @@ describe("Worktree grouping", () => {
   });
 
   it("whitespace-only search shows all entries", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "   ");
 
     expect(filtered).toHaveLength(3);
   });
 
   it("search is case-insensitive", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "BACKEND");
 
     expect(filtered).toHaveLength(1);
-    expect(filtered[0].realmName).toBe("backend");
+    expect(filtered[0].projectName).toBe("backend");
   });
 
-  it("orphans grouped with matching realm by realm_path", () => {
+  it("orphans grouped with matching project by project_path", () => {
     const orphan = makeOrphan({
-      realm_path: "/Users/dev/frontend",
+      project_path: "/Users/dev/frontend",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/orphan_old",
       branch_name: "old-branch",
       kind: "directory_only",
     });
-    const groups = groupByRealm(worktrees, [orphan]);
+    const groups = groupByProject(worktrees, [orphan]);
 
-    const frontendGroup = groups.find((g) => g.realmId === "realm-1")!;
+    const frontendGroup = groups.find((g) => g.projectId === "project-1")!;
     expect(frontendGroup.orphans).toHaveLength(1);
     expect(frontendGroup.orphans[0].worktree_path).toBe(
       "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/orphan_old",
     );
   });
 
-  it("orphans without matching realm create standalone group", () => {
+  it("orphans without matching project create standalone group", () => {
     const orphan = makeOrphan({
-      realm_path: "/Users/dev/unknown-project",
+      project_path: "/Users/dev/unknown-project",
       worktree_path: "/app/data/hermes-worktrees/a1b2c3d4e5f6a7b8/orphan_x",
       kind: "directory_only",
     });
-    const groups = groupByRealm(worktrees, [orphan]);
+    const groups = groupByProject(worktrees, [orphan]);
 
-    // 3 existing realms + 1 new standalone group for the orphan
+    // 3 existing projects + 1 new standalone group for the orphan
     expect(groups).toHaveLength(4);
-    const standaloneGroup = groups.find((g) => g.realmPath === "/Users/dev/unknown-project")!;
+    const standaloneGroup = groups.find((g) => g.projectPath === "/Users/dev/unknown-project")!;
     expect(standaloneGroup).toBeDefined();
     expect(standaloneGroup.orphans).toHaveLength(1);
     expect(standaloneGroup.worktrees).toHaveLength(0);
   });
 
   it("no-match search returns empty", () => {
-    const groups = groupByRealm(worktrees, []);
+    const groups = groupByProject(worktrees, []);
     const filtered = filterGroups(groups, "zzz-no-match-zzz");
 
     expect(filtered).toHaveLength(0);

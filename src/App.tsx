@@ -690,7 +690,7 @@ function AppContent() {
         )}
         {ui.gitPanelOpen && !ui.flowMode && !activePluginPanel && state.activeSessionId && (
           <PanelErrorBoundary panelName="Git Panel">
-            <SessionGitPanel sessionId={state.activeSessionId} realmId="" />
+            <SessionGitPanel sessionId={state.activeSessionId} projectId="" />
           </PanelErrorBoundary>
         )}
         {ui.processPanelOpen && !ui.flowMode && !activePluginPanel && (
@@ -734,7 +734,7 @@ function AppContent() {
                   return (
                     <FilePreviewPanel
                       sessionId={state.activeSessionId}
-                      realmId={ui.filePreview.realmId}
+                      projectId={ui.filePreview.projectId}
                       filePath={ui.filePreview.filePath}
                       onBack={() => dispatch({ type: "CLOSE_FILE_PREVIEW" })}
                       fileHandler={handler?.component}

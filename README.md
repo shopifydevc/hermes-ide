@@ -12,7 +12,7 @@
 
 > An AI-native terminal that understands your projects, predicts your commands, and executes autonomously.
 
-Hermes IDE is a desktop terminal emulator that deeply integrates AI assistance into command-line workflows. It scans your projects to build context ("Realms"), suggests commands in real time, tracks errors and resolutions, and can execute tasks autonomously — all without leaving the terminal.
+Hermes IDE is a desktop terminal emulator that deeply integrates AI assistance into command-line workflows. It scans your projects to build context, suggests commands in real time, tracks errors and resolutions, and can execute tasks autonomously — all without leaving the terminal.
 
 **Platforms:** macOS, Windows, Linux
 
@@ -39,10 +39,10 @@ Hermes IDE is a desktop terminal emulator that deeply integrates AI assistance i
 - **Error pattern matching** — learns error fingerprints and auto-applies known resolutions
 - **Stuck detection** — monitors for hanging processes and offers interrupts
 
-### Project Awareness (Realms)
+### Project Awareness
 - **Automatic scanning** — detects languages, frameworks, architecture, and conventions
 - **Context injection** — attaches project knowledge to AI agents via a token budget
-- **Multi-realm support** — attach multiple project contexts to a single session
+- **Multi-project support** — attach multiple project contexts to a single session
 
 ### Productivity
 - **Command Palette** — fuzzy search for any action
@@ -100,7 +100,7 @@ Hermes IDE is a [Tauri 2](https://tauri.app) application:
 │         Tauri IPC Bridge         │
 ├──────────────────────────────────┤
 │          Rust Backend            │
-│   (PTY, SQLite, Realm Scanner)   │
+│   (PTY, SQLite, Project Scanner)  │
 └──────────────────────────────────┘
 ```
 
@@ -129,7 +129,7 @@ hermes-ide/
 │   ├── src/
 │   │   ├── pty/                # PTY session management
 │   │   ├── db/                 # SQLite persistence layer
-│   │   ├── realm/              # Project scanning & context assembly
+│   │   ├── project/            # Project scanning & context assembly
 │   │   └── workspace/          # Workspace detection
 │   ├── Cargo.toml              # Rust dependencies
 │   └── tauri.conf.json         # Tauri app configuration

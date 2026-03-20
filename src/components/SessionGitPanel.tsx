@@ -11,7 +11,7 @@ import "../styles/components/SessionGitPanel.css";
 
 interface SessionGitPanelProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
 }
 
 /**
@@ -22,10 +22,10 @@ interface SessionGitPanelProps {
  * This is a thin wrapper that reuses existing GitProjectSection
  * sub-components, scoped to the session's worktree.
  */
-export function SessionGitPanel({ sessionId, realmId }: SessionGitPanelProps) {
+export function SessionGitPanel({ sessionId, projectId }: SessionGitPanelProps) {
   const [pollInterval, setPollInterval] = useState(3000);
   const { status, error, refresh } = useGitStatus(sessionId, true, pollInterval);
-  const [diffTarget, setDiffTarget] = useState<{ sessionId: string; realmId: string; file: GitFile } | null>(null);
+  const [diffTarget, setDiffTarget] = useState<{ sessionId: string; projectId: string; file: GitFile } | null>(null);
   const [toast, setToast] = useState<GitToast | null>(null);
   const [worktreeInfo, setWorktreeInfo] = useState<SessionWorktree | null>(null);
 
@@ -42,10 +42,10 @@ export function SessionGitPanel({ sessionId, realmId }: SessionGitPanelProps) {
 
   // Load worktree info for this session
   useEffect(() => {
-    getSessionWorktreeInfo(sessionId, realmId)
+    getSessionWorktreeInfo(sessionId, projectId)
       .then((info) => setWorktreeInfo(info))
       .catch(() => {});
-  }, [sessionId, realmId]);
+  }, [sessionId, projectId]);
 
   // Clear diff when session changes
   useEffect(() => {
@@ -64,7 +64,7 @@ export function SessionGitPanel({ sessionId, realmId }: SessionGitPanelProps) {
   }, []);
 
   const handleDiffFile = useCallback((sid: string, rid: string, file: GitFile) => {
-    setDiffTarget({ sessionId: sid, realmId: rid, file });
+    setDiffTarget({ sessionId: sid, projectId: rid, file });
   }, []);
 
   return (
@@ -106,7 +106,7 @@ export function SessionGitPanel({ sessionId, realmId }: SessionGitPanelProps) {
           <GitProjectSection
             key={project.project_id}
             sessionId={sessionId}
-            realmId={project.project_id}
+            projectId={project.project_id}
             project={project}
             onRefresh={refresh}
             onDiffFile={handleDiffFile}
@@ -128,7 +128,7 @@ export function SessionGitPanel({ sessionId, realmId }: SessionGitPanelProps) {
       {diffTarget && (
         <GitDiffView
           sessionId={diffTarget.sessionId}
-          realmId={diffTarget.realmId}
+          projectId={diffTarget.projectId}
           file={diffTarget.file}
           onClose={() => setDiffTarget(null)}
         />

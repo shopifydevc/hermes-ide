@@ -5,12 +5,12 @@ import "../styles/components/GitPanel.css";
 
 interface GitDiffViewProps {
   sessionId: string;
-  realmId: string;
+  projectId: string;
   file: GitFile;
   onClose: () => void;
 }
 
-export function GitDiffView({ sessionId, realmId, file, onClose }: GitDiffViewProps) {
+export function GitDiffView({ sessionId, projectId, file, onClose }: GitDiffViewProps) {
   const [diff, setDiff] = useState<GitDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,11 +22,11 @@ export function GitDiffView({ sessionId, realmId, file, onClose }: GitDiffViewPr
     setLoading(true);
     setError(null);
     const staged = file.area === "staged";
-    gitDiff(sessionId, realmId, file.path, staged)
+    gitDiff(sessionId, projectId, file.path, staged)
       .then((d) => { if (!cancelled) { setDiff(d); setLoading(false); } })
       .catch((e) => { if (!cancelled) { setError(String(e)); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [sessionId, realmId, file.path, file.area]);
+  }, [sessionId, projectId, file.path, file.area]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -117,7 +117,7 @@ interface SessionState {
     searchPanelOpen: boolean;
     composerOpen: boolean;
     activeLeftTab: "sessions" | "terminal" | "processes" | "git" | "files" | "search";
-    filePreview: { realmId: string; filePath: string } | null;
+    filePreview: { projectId: string; filePath: string } | null;
   };
 }
 
@@ -558,7 +558,7 @@ export function sessionReducer(state: SessionState, action: SessionAction): Sess
 
     // ─── File preview actions ─────────────────────────────────────────
     case "SET_FILE_PREVIEW":
-      return { ...state, ui: { ...state.ui, filePreview: { realmId: action.realmId, filePath: action.filePath } } };
+      return { ...state, ui: { ...state.ui, filePreview: { projectId: action.projectId, filePath: action.filePath } } };
     case "CLOSE_FILE_PREVIEW":
       return state.ui.filePreview ? { ...state, ui: { ...state.ui, filePreview: null } } : state;
 
@@ -637,7 +637,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     sessionId: string;
     label: string;
     changes: DirtyWorktreeChange[];
-    stashErrors?: Array<{ realmName: string; error: string }>;
+    stashErrors?: Array<{ projectName: string; error: string }>;
   } | null>(null);
 
   // Long-running threshold: 30 seconds of busy before notification on idle
@@ -810,7 +810,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 color: saved.color,
                 workspacePaths: null,
                 aiProvider: saved.ai_provider,
-                realmIds: saved.project_ids.length > 0 ? saved.project_ids : null,
+                projectIds: saved.project_ids.length > 0 ? saved.project_ids : null,
                 autoApprove: saved.auto_approve ?? false,
                 sshHost: saved.ssh_info?.host || null,
                 sshPort: saved.ssh_info?.port || null,
@@ -912,16 +912,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Create worktrees for each git project with a branch selection
       const sharedBranches: string[] = [];
       if (opts?.branchSelections && opts?.projectIds?.length) {
-        for (const realmId of opts.projectIds) {
-          const sel = opts.branchSelections[realmId];
+        for (const projectId of opts.projectIds) {
+          const sel = opts.branchSelections[projectId];
           if (!sel) continue; // Non-git project or user skipped branches for this project
           try {
-            const wtResult = await createWorktree(preSessionId, realmId, sel.branch, sel.createNew);
+            const wtResult = await createWorktree(preSessionId, projectId, sel.branch, sel.createNew);
             if (wtResult.isShared) {
               sharedBranches.push(sel.branch);
             }
           } catch (wtErr) {
-            console.warn(`[SessionContext] Failed to create worktree for realm ${realmId}:`, wtErr);
+            console.warn(`[SessionContext] Failed to create worktree for project ${projectId}:`, wtErr);
           }
         }
       } else if (opts?.branchName && opts?.projectIds?.length) {
@@ -954,7 +954,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         color: opts?.color || null,
         workspacePaths: null,
         aiProvider: opts?.aiProvider || null,
-        realmIds: opts?.projectIds || null,
+        projectIds: opts?.projectIds || null,
         autoApprove: opts?.autoApprove ?? false,
         sshHost: opts?.sshHost || null,
         sshPort: opts?.sshPort || null,
@@ -1059,8 +1059,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 // Worktree info not available — continue without branch name
               }
               dirtyChanges.push({
-                realmId: project.id,
-                realmName: project.name,
+                projectId: project.id,
+                projectName: project.name,
                 branchName,
                 files: changes.files,
               });
@@ -1098,14 +1098,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const handleDirtyStashAndClose = useCallback(async () => {
     if (!pendingDirtyClose) return;
     const { sessionId, changes } = pendingDirtyClose;
-    const failures: Array<{ realmName: string; error: string }> = [];
+    const failures: Array<{ projectName: string; error: string }> = [];
     for (const change of changes) {
       try {
-        await stashWorktree(sessionId, change.realmId, "Auto-stash before closing session");
+        await stashWorktree(sessionId, change.projectId, "Auto-stash before closing session");
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         console.warn("[SessionContext] Failed to stash worktree:", e);
-        failures.push({ realmName: change.realmName, error: message });
+        failures.push({ projectName: change.projectName, error: message });
       }
     }
     if (failures.length > 0) {

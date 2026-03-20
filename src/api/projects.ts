@@ -3,37 +3,37 @@ import type { Project } from "../types/project";
 import type { ProjectContextInfo } from "../types/context";
 
 export function getProjects(): Promise<Project[]> {
-  return invoke<Project[]>("get_realms").then((projects) =>
+  return invoke<Project[]>("get_registered_projects").then((projects) =>
     projects.filter((p) => !p.path.includes("hermes-worktrees/"))
   );
 }
 
 export function createProject(path: string, name: string | null): Promise<Project> {
-  return invoke<Project>("create_realm", { path, name });
+  return invoke<Project>("create_project", { path, name });
 }
 
 export function deleteProject(id: string): Promise<void> {
-  return invoke("delete_realm", { id });
+  return invoke("delete_project", { id });
 }
 
 export function getSessionProjects(sessionId: string): Promise<Project[]> {
-  return invoke<Project[]>("get_session_realms", { sessionId });
+  return invoke<Project[]>("get_session_projects", { sessionId });
 }
 
-export function attachSessionProject(sessionId: string, realmId: string, role: string): Promise<void> {
-  return invoke("attach_session_realm", { sessionId, realmId, role });
+export function attachSessionProject(sessionId: string, projectId: string, role: string): Promise<void> {
+  return invoke("attach_session_project", { sessionId, projectId, role });
 }
 
-export function detachSessionProject(sessionId: string, realmId: string): Promise<void> {
-  return invoke("detach_session_realm", { sessionId, realmId });
+export function detachSessionProject(sessionId: string, projectId: string): Promise<void> {
+  return invoke("detach_session_project", { sessionId, projectId });
 }
 
 export function scanProject(id: string, depth: string): Promise<void> {
-  return invoke("scan_realm", { id, depth });
+  return invoke("scan_project", { id, depth });
 }
 
 export function nudgeProjectContext(sessionId: string): Promise<void> {
-  return invoke("nudge_realm_context", { sessionId });
+  return invoke("nudge_project_context", { sessionId });
 }
 
 export function scanDirectory(path: string, maxDepth: number): Promise<void> {
@@ -44,6 +44,6 @@ export function detectProject(path: string): Promise<void> {
   return invoke("detect_project", { path });
 }
 
-export function assembleSessionContext(sessionId: string, tokenBudget: number): Promise<{ realms: ProjectContextInfo[]; estimated_tokens: number; token_budget: number }> {
-  return invoke<{ realms: ProjectContextInfo[]; estimated_tokens: number; token_budget: number }>("assemble_session_context", { sessionId, tokenBudget });
+export function assembleSessionContext(sessionId: string, tokenBudget: number): Promise<{ projects: ProjectContextInfo[]; estimated_tokens: number; token_budget: number }> {
+  return invoke<{ projects: ProjectContextInfo[]; estimated_tokens: number; token_budget: number }>("assemble_session_context", { sessionId, tokenBudget });
 }
