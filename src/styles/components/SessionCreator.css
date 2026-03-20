@@ -665,13 +665,17 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
 }
 
-.session-creator-branch-multi::-webkit-scrollbar { width: 4px; }
-.session-creator-branch-multi::-webkit-scrollbar-thumb { background: var(--bg-3); }
+/* Footer-level actions (outside scrollable body) */
+.session-creator-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
 
 .session-creator-branch-project {
   border: 1px solid var(--border);

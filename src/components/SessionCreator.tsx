@@ -832,64 +832,66 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
 
         {/* Step 2 (conditional): Select Branch — per-project */}
         {step === "branch" && gitProjectIds.length > 0 && (
-          <div className="session-creator-body">
-            <div className="session-creator-section-title">Select Branches</div>
-            <div className="session-creator-branch-multi">
-              {selectedProjectIds.map((projectId) => {
-                const isGit = gitProjectIds.includes(projectId);
-                const projectName = allProjects.find((r) => r.id === projectId)?.name || projectId;
-                const isExpanded = expandedProjectId === projectId;
+          <>
+            <div className="session-creator-body">
+              <div className="session-creator-section-title">Select Branches</div>
+              <div className="session-creator-branch-multi">
+                {selectedProjectIds.map((projectId) => {
+                  const isGit = gitProjectIds.includes(projectId);
+                  const projectName = allProjects.find((r) => r.id === projectId)?.name || projectId;
+                  const isExpanded = expandedProjectId === projectId;
 
-                if (!isGit) {
-                  return (
-                    <div key={projectId} className="session-creator-branch-project">
-                      <div className="session-creator-branch-project-header">
-                        <span className="session-creator-branch-project-name">{projectName}</span>
-                        <span className="session-creator-branch-nonGit">Not a git repository</span>
+                  if (!isGit) {
+                    return (
+                      <div key={projectId} className="session-creator-branch-project">
+                        <div className="session-creator-branch-project-header">
+                          <span className="session-creator-branch-project-name">{projectName}</span>
+                          <span className="session-creator-branch-nonGit">Not a git repository</span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                }
+                    );
+                  }
 
-                return (
-                  <div key={projectId} className={`session-creator-branch-project ${isExpanded ? "expanded" : ""}`}>
-                    <div
-                      className="session-creator-branch-project-header"
-                      onClick={() => setExpandedProjectId(isExpanded ? null : projectId)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <span className="session-creator-branch-project-chevron">{isExpanded ? "\u25BC" : "\u25B6"}</span>
-                      <span className="session-creator-branch-project-name">{projectName}</span>
-                      {branchSelections[projectId] && (
-                        <span className="session-creator-branch-selected-label">
-                          {branchSelections[projectId].branch}
-                          {branchSelections[projectId].createNew ? " (new)" : ""}
-                        </span>
+                  return (
+                    <div key={projectId} className={`session-creator-branch-project ${isExpanded ? "expanded" : ""}`}>
+                      <div
+                        className="session-creator-branch-project-header"
+                        onClick={() => setExpandedProjectId(isExpanded ? null : projectId)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        <span className="session-creator-branch-project-chevron">{isExpanded ? "\u25BC" : "\u25B6"}</span>
+                        <span className="session-creator-branch-project-name">{projectName}</span>
+                        {branchSelections[projectId] && (
+                          <span className="session-creator-branch-selected-label">
+                            {branchSelections[projectId].branch}
+                            {branchSelections[projectId].createNew ? " (new)" : ""}
+                          </span>
+                        )}
+                      </div>
+                      {isExpanded && (
+                        <SessionBranchSelector
+                          projectId={projectId}
+                          onBranchSelected={(name, isNew) => {
+                            setBranchSelections((prev) => ({
+                              ...prev,
+                              [projectId]: { branch: name, createNew: isNew },
+                            }));
+                          }}
+                          onSkip={() => {
+                            setBranchSelections((prev) => {
+                              const next = { ...prev };
+                              delete next[projectId];
+                              return next;
+                            });
+                          }}
+                        />
                       )}
                     </div>
-                    {isExpanded && (
-                      <SessionBranchSelector
-                        projectId={projectId}
-                        onBranchSelected={(name, isNew) => {
-                          setBranchSelections((prev) => ({
-                            ...prev,
-                            [projectId]: { branch: name, createNew: isNew },
-                          }));
-                        }}
-                        onSkip={() => {
-                          setBranchSelections((prev) => {
-                            const next = { ...prev };
-                            delete next[projectId];
-                            return next;
-                          });
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-            <div className="session-creator-actions">
+            <div className="session-creator-footer-actions">
               <button className="session-creator-btn-secondary" onClick={goBack}>
                 Back
               </button>
@@ -903,7 +905,7 @@ export function SessionCreator({ onClose, onCreate, defaultGroup }: SessionCreat
                 Continue
               </button>
             </div>
-          </div>
+          </>
         )}
 
         {/* Tmux session picker (SSH only) */}
