@@ -168,7 +168,11 @@ fn detect_project_at_path(dir: &Path) -> Option<ProjectInfo> {
 
     // Skip Hermes worktree directories — they are not standalone projects
     let path_str = dir.to_string_lossy();
-    if path_str.contains("hermes-worktrees/") || path_str.contains(".hermes/worktrees/") {
+    if path_str.contains("hermes-worktrees/")
+        || path_str.contains("hermes-worktrees\\")
+        || path_str.contains(".hermes/worktrees/")
+        || path_str.contains(".hermes\\worktrees\\")
+    {
         return None;
     }
 
