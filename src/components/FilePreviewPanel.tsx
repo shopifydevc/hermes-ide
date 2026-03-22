@@ -26,13 +26,15 @@ type TokenRule = [RegExp, string];
 const COMMON_RULES: TokenRule[] = [
   [/\/\/.*$/gm, "syn-comment"],
   [/\/\*[\s\S]*?\*\//gm, "syn-comment"],
-  [/#.*$/gm, "syn-comment"],
   [/"(?:[^"\\]|\\.)*"/g, "syn-string"],
   [/'(?:[^'\\]|\\.)*'/g, "syn-string"],
   [/`(?:[^`\\]|\\.)*`/g, "syn-string"],
   [/\b\d+\.?\d*(?:e[+-]?\d+)?\b/gi, "syn-number"],
   [/\b0x[0-9a-f]+\b/gi, "syn-number"],
 ];
+
+// Languages where # starts a line comment
+const HASH_COMMENT_LANGUAGES = new Set(["python", "bash", "yaml", "r"]);
 
 const KEYWORD_SETS: Record<string, string> = {
   typescript: "abstract|as|async|await|break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|finally|for|from|function|if|implements|import|in|instanceof|interface|let|new|of|package|private|protected|public|return|static|super|switch|this|throw|try|type|typeof|var|void|while|with|yield",
@@ -74,6 +76,9 @@ function highlightLine(line: string, language: string): string {
   const spans: Span[] = [];
 
   const rules: TokenRule[] = [...COMMON_RULES];
+  if (HASH_COMMENT_LANGUAGES.has(language)) {
+    rules.push([/#.*$/gm, "syn-comment"]);
+  }
   const keywords = getKeywords(language);
   if (keywords) {
     rules.push([new RegExp(`\\b(?:${keywords})\\b`, "g"), "syn-keyword"]);
@@ -175,6 +180,19 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const lineNumbersRef = useRef<HTMLDivElement | null>(null);
 
+  const editor = useFileEditor({
+    sessionId,
+    projectId,
+    filePath,
+    initialContent: file?.content ?? "",
+    initialMtime: (file as FileContent)?.mtime ?? 0,
+    isSSH,
+  });
+
+  // Keep a ref so the disk-change handler always sees the latest dirty state
+  const editorDirtyRef = useRef(editor.isDirty);
+  editorDirtyRef.current = editor.isDirty;
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -188,10 +206,12 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
   }, [sessionId, projectId, filePath, isSSH]);
 
   // Reload file when it changes on disk (e.g., git discard)
+  // If user has unsaved edits, skip the reload — their in-editor work takes priority
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { projectId: string; filePath: string };
       if (detail.projectId === projectId && detail.filePath === filePath) {
+        if (editorDirtyRef.current) return;
         const promise = isSSH
           ? sshReadFile(sessionId, filePath).then((r) => ({ ...r, mtime: 0 }))
           : readFileContent(sessionId, projectId, filePath);
@@ -204,11 +224,11 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
 
   useEffect(() => {
     const key = isSSH ? "preferred_ssh_editor" : "preferred_editor";
-    getSetting(key).then((editor) => {
+    getSetting(key).then((ed) => {
       if (isSSH) {
-        setEditorLabel(SSH_EDITOR_LABELS[editor] || "Vim");
+        setEditorLabel(SSH_EDITOR_LABELS[ed] || "Vim");
       } else {
-        setEditorLabel(EDITOR_LABELS[editor] || "System Default");
+        setEditorLabel(EDITOR_LABELS[ed] || "System Default");
       }
     }).catch(() => {});
   }, [isSSH]);
@@ -216,8 +236,8 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
   const handleOpenInEditor = useCallback(() => {
     if (isSSH) {
       getSetting("preferred_ssh_editor")
-        .then((editor) => {
-          const cmd = editor || "vim";
+        .then((ed) => {
+          const cmd = ed || "vim";
 
           if (SSH_GUI_EDITORS.has(cmd) && sshInfo) {
             // GUI editors: run locally with remote connection args
@@ -244,7 +264,7 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
         .catch(console.error);
     } else {
       getSetting("preferred_editor")
-        .then((editor) => openFileInEditor(sessionId, projectId, filePath, editor || null))
+        .then((ed) => openFileInEditor(sessionId, projectId, filePath, ed || null))
         .catch(console.error);
     }
   }, [sessionId, projectId, filePath, isSSH, sshInfo, onBack]);
@@ -258,22 +278,16 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
     }
   }, [file]);
 
-  const editor = useFileEditor({
-    sessionId,
-    projectId,
-    filePath,
-    initialContent: file?.content ?? "",
-    initialMtime: (file as FileContent)?.mtime ?? 0,
-    isSSH,
-  });
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts — depend on stable function refs, not the whole editor object
+  const editorSave = editor.save;
+  const editorUndo = editor.undo;
+  const editorRedo = editor.redo;
   useEffect(() => {
     if (!editMode) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        editor.save();
+        editorSave();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "f") {
         e.preventDefault();
@@ -289,16 +303,16 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        editor.undo();
+        editorUndo();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
         e.preventDefault();
-        editor.redo();
+        editorRedo();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [editMode, editor]);
+  }, [editMode, editorSave, editorUndo, editorRedo]);
 
   // Scroll sync: textarea ↔ line numbers
   const handleTextareaScroll = useCallback(() => {
@@ -308,20 +322,22 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
   }, []);
 
   // Tab key inserts tab character
+  const editorContent = editor.content;
+  const editorSetContent = editor.setContent;
   const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab") {
       e.preventDefault();
       const ta = e.currentTarget;
       const start = ta.selectionStart;
       const end = ta.selectionEnd;
-      const newValue = editor.content.substring(0, start) + "\t" + editor.content.substring(end);
-      editor.setContent(newValue);
+      const newValue = editorContent.substring(0, start) + "\t" + editorContent.substring(end);
+      editorSetContent(newValue);
       // Restore cursor position after React re-render
       requestAnimationFrame(() => {
         ta.selectionStart = ta.selectionEnd = start + 1;
       });
     }
-  }, [editor]);
+  }, [editorContent, editorSetContent]);
 
   const handleBack = useCallback(() => {
     if (editor.isDirty) {
@@ -521,7 +537,7 @@ export function FilePreviewPanel({ sessionId, projectId, filePath, onBack, fileH
             <div className="file-editor-confirm-actions">
               <button className="file-editor-confirm-btn" onClick={() => setShowCloseConfirm(false)}>Cancel</button>
               <button className="file-editor-confirm-btn file-editor-confirm-discard" onClick={() => { setShowCloseConfirm(false); onBack(); }}>Discard</button>
-              <button className="file-editor-confirm-btn file-editor-confirm-save" onClick={async () => { await editor.save(); setShowCloseConfirm(false); onBack(); }}>Save &amp; Close</button>
+              <button className="file-editor-confirm-btn file-editor-confirm-save" onClick={async () => { const ok = await editor.save(); if (ok) { setShowCloseConfirm(false); onBack(); } }}>Save &amp; Close</button>
             </div>
           </div>
         </div>

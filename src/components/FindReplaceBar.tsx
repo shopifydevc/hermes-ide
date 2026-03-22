@@ -1,5 +1,5 @@
 import "../styles/components/FindReplaceBar.css";
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 
 export interface FindMatch {
 	start: number;
@@ -37,7 +37,7 @@ export function FindReplaceBar({ content, onReplace, textareaRef, onClose, focus
 		searchRef.current?.select();
 	}, [focusTrigger]);
 
-	const getMatches = useCallback((): number[] => {
+	const matches = useMemo((): number[] => {
 		if (!query) return [];
 		const positions: number[] = [];
 		const searchContent = caseSensitive ? content : content.toLowerCase();
@@ -51,8 +51,6 @@ export function FindReplaceBar({ content, onReplace, textareaRef, onClose, focus
 		}
 		return positions;
 	}, [content, query, caseSensitive]);
-
-	const matches = getMatches();
 	const matchCount = matches.length;
 
 	const selectMatch = useCallback((index: number) => {

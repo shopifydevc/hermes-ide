@@ -17,7 +17,7 @@ interface UseFileEditorReturn {
 	isDirty: boolean;
 	isSaving: boolean;
 	saveError: string | null;
-	save: () => Promise<void>;
+	save: () => Promise<boolean>;
 	lastSavedAt: number | null;
 	undo: () => void;
 	redo: () => void;
@@ -26,6 +26,8 @@ interface UseFileEditorReturn {
 }
 
 const MAX_HISTORY = 200;
+// Cap undo memory: allow ~20 MB total for undo stack
+const MAX_UNDO_BYTES = 20 * 1024 * 1024;
 
 export function useFileEditor(opts: UseFileEditorOptions): UseFileEditorReturn {
 	const { sessionId, projectId, filePath, initialContent, initialMtime, isSSH, autoSaveDelay = 2000 } = opts;
@@ -52,7 +54,9 @@ export function useFileEditor(opts: UseFileEditorOptions): UseFileEditorReturn {
 		const now = Date.now();
 		if (now - lastPushTime.current > 300 || undoStack.current.length === 0) {
 			undoStack.current.push(contentRef.current);
-			if (undoStack.current.length > MAX_HISTORY) {
+			// Enforce both count and memory limits
+			const maxEntries = Math.max(10, Math.min(MAX_HISTORY, Math.floor(MAX_UNDO_BYTES / Math.max(1, contentRef.current.length))));
+			while (undoStack.current.length > maxEntries) {
 				undoStack.current.shift();
 			}
 			lastPushTime.current = now;
@@ -96,9 +100,9 @@ export function useFileEditor(opts: UseFileEditorOptions): UseFileEditorReturn {
 		setLastSavedAt(null);
 	}, [filePath, initialContent, initialMtime]);
 
-	const doSave = useCallback(async () => {
+	const doSave = useCallback(async (): Promise<boolean> => {
 		const currentContent = contentRef.current;
-		if (currentContent === originalContent) return;
+		if (currentContent === originalContent) return true;
 
 		setIsSaving(true);
 		setSaveError(null);
@@ -111,20 +115,22 @@ export function useFileEditor(opts: UseFileEditorOptions): UseFileEditorReturn {
 			}
 			setOriginalContent(currentContent);
 			setLastSavedAt(Date.now());
+			return true;
 		} catch (err) {
 			setSaveError(err instanceof Error ? err.message : String(err));
+			return false;
 		} finally {
 			setIsSaving(false);
 		}
 	}, [sessionId, projectId, filePath, isSSH, originalContent]);
 
-	// Immediate save (Cmd+S)
-	const save = useCallback(async () => {
+	// Immediate save (Cmd+S) — returns true if save succeeded or was unnecessary
+	const save = useCallback(async (): Promise<boolean> => {
 		if (autoSaveTimer.current) {
 			clearTimeout(autoSaveTimer.current);
 			autoSaveTimer.current = null;
 		}
-		await doSave();
+		return doSave();
 	}, [doSave]);
 
 	// Auto-save with debounce
