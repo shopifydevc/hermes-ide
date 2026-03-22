@@ -18,6 +18,28 @@ import { setAnalyticsEnabled } from "../utils/analytics";
 import { SHORTCUT_GROUPS } from "./ShortcutsPanel";
 import { PluginManager } from "./PluginManager";
 
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  SETTINGS PAGE — EXPORT / IMPORT CONTRACT                              ║
+// ║                                                                        ║
+// ║  Every setting displayed here is persisted via setSetting(key, value)   ║
+// ║  and automatically included in settings export/import.                 ║
+// ║                                                                        ║
+// ║  When adding a new setting:                                            ║
+// ║  1. Add the key to VALID_SETTING_KEYS in src-tauri/src/db/mod.rs       ║
+// ║  2. If it's machine-specific (paths, geometry, timestamps), also add   ║
+// ║     it to EXPORT_EXCLUDED_KEYS in the same file so it won't export.    ║
+// ║  3. Add the UI control in the appropriate tab below.                   ║
+// ║                                                                        ║
+// ║  When renaming or removing a setting:                                  ║
+// ║  1. Update VALID_SETTING_KEYS (remove old, add new).                   ║
+// ║  2. Consider whether imported files from older versions need the old   ║
+// ║     key mapped to the new one (add migration logic in import_settings  ║
+// ║     in db/mod.rs).                                                     ║
+// ║                                                                        ║
+// ║  Plugin settings are stored separately (plugin_storage table) and are  ║
+// ║  NOT included in app settings export. Plugins manage their own data.   ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
 interface SettingsProps {
   onClose: () => void;
   initialTab?: string;

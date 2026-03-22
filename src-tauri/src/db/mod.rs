@@ -2258,16 +2258,29 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<HashMap<String, String
 }
 
 /// Allowlist of valid setting keys that the frontend may write.
+///
+/// ╔══════════════════════════════════════════════════════════════════════╗
+/// ║  IMPORTANT — KEEP THIS LIST IN SYNC                                ║
+/// ║                                                                    ║
+/// ║  When you add a new setting anywhere in the app:                   ║
+/// ║  1. Add the key here so set_setting() accepts it.                  ║
+/// ║  2. The key is automatically included in export/import.            ║
+/// ║  3. If the setting should NOT be exported (e.g. window geometry),  ║
+/// ║     add it to EXPORT_EXCLUDED_KEYS below instead.                  ║
+/// ║                                                                    ║
+/// ║  If you rename or remove a setting, update this list AND consider  ║
+/// ║  adding a migration note in the import path.                       ║
+/// ╚══════════════════════════════════════════════════════════════════════╝
 const VALID_SETTING_KEYS: &[&str] = &[
-    // Window geometry
+    // Window geometry (excluded from export — machine-specific)
     "window_width",
     "window_height",
     "window_x",
     "window_y",
-    // Settings panel geometry
+    // Settings panel geometry (excluded from export — machine-specific)
     "settings_panel_width",
     "settings_panel_height",
-    // New session creator modal geometry
+    // New session creator modal geometry (excluded from export — machine-specific)
     "session_creator_panel_width",
     "session_creator_panel_height",
     // Appearance
@@ -2280,13 +2293,13 @@ const VALID_SETTING_KEYS: &[&str] = &[
     "default_cwd",
     "scrollback",
     "restore_sessions",
-    // Workspace
+    // Workspace (excluded from export — machine-specific)
     "saved_workspace",
     // Behaviour
     "skip_close_confirm",
     "execution_mode",
     "telemetry_enabled",
-    // Onboarding / What's New
+    // Onboarding / What's New (excluded from export — per-install state)
     "onboarding_completed",
     "last_seen_version",
     "suppress_whats_new",
@@ -2311,11 +2324,15 @@ const VALID_SETTING_KEYS: &[&str] = &[
     "plugin_auto_update",
     "plugin_ignored_updates",
     "plugin_last_update_check",
+    // Plugin lifecycle
+    "plugin_explicitly_uninstalled",
     // File browser
     "preferred_editor",
     "preferred_ssh_editor",
     // SSH
     "ssh_connection_history",
+    // UI layout
+    "activity_bar_order",
 ];
 
 #[tauri::command]
@@ -2913,9 +2930,76 @@ mod tests {
 }
 
 // ─── Settings Export / Import Commands ───────────────────────────────
+//
+// Export format (v1):
+// {
+//   "_hermes_export_version": "1",
+//   "_hermes_app_version": "0.6.0",
+//   "_hermes_exported_at": "2026-03-22T...",
+//   "theme": "frosted-dark",
+//   ...
+// }
+//
+// Machine-specific and per-install keys are excluded from export
+// so that importing on a different machine doesn't break layout.
+//
+// ── Plugin export/import (design notes) ──────────────────────────────
+//
+// Plugins are intentionally NOT included in settings export for these
+// reasons:
+//
+// 1. Version incompatibility: The user may export from IDE v1.5 and
+//    import into v2.0. Plugin APIs can change between versions, making
+//    old plugin bundles crash or behave incorrectly.
+//
+// 2. Platform differences: Plugin bundles may include native components
+//    that work on macOS but not Linux/Windows.
+//
+// 3. Registry as source of truth: Plugins should be installed from the
+//    registry (which serves the latest compatible version), not from a
+//    stale export file. Bundling plugin .tgz data into a settings JSON
+//    would bloat the export and bypass version checks.
+//
+// 4. Plugin settings isolation: Each plugin stores its own settings in
+//    the plugin_storage table, scoped by plugin ID. These are private
+//    to the plugin and may contain auth tokens or API keys.
+//
+// Future enhancement: Export could include a `_hermes_plugins` metadata
+// field listing installed plugin IDs + versions (informational only).
+// On import, the IDE could prompt: "The following plugins were installed
+// when this file was exported. Would you like to install them?" and then
+// fetch the latest compatible version from the registry.  This is a
+// separate feature tracked outside this module.
 
 /// Maximum allowed file size for settings import (1 MB).
 const MAX_SETTINGS_FILE_SIZE: u64 = 1_048_576;
+
+/// Settings that are machine-specific or per-install state and should
+/// NOT be included in export files.  They are still valid for
+/// `set_setting` / `get_setting` calls locally.
+const EXPORT_EXCLUDED_KEYS: &[&str] = &[
+    // Window geometry — depends on monitor/resolution
+    "window_width",
+    "window_height",
+    "window_x",
+    "window_y",
+    // Panel geometry — depends on window size
+    "settings_panel_width",
+    "settings_panel_height",
+    "session_creator_panel_width",
+    "session_creator_panel_height",
+    // Workspace layout — contains absolute paths
+    "saved_workspace",
+    // Onboarding / What's New — per-install lifecycle
+    "onboarding_completed",
+    "last_seen_version",
+    "suppress_whats_new",
+    // Plugin update timestamps — stale on import
+    "plugin_last_update_check",
+    "plugin_ignored_updates",
+    // SSH history — may contain sensitive hostnames
+    "ssh_connection_history",
+];
 
 /// Validate a settings file path for export or import.
 /// - Must have a `.json` extension
@@ -2962,8 +3046,29 @@ fn validate_settings_path(path: &str, for_write: bool) -> Result<std::path::Path
 pub fn export_settings(state: State<'_, AppState>, path: String) -> Result<(), String> {
     let validated = validate_settings_path(&path, true)?;
     let db = state.db.lock().map_err(|e| e.to_string())?;
-    let settings = db.get_all_settings()?;
-    let json = serde_json::to_string_pretty(&settings)
+    let all = db.get_all_settings()?;
+
+    // Filter out machine-specific keys
+    let mut export: HashMap<String, String> = all
+        .into_iter()
+        .filter(|(k, _)| !EXPORT_EXCLUDED_KEYS.contains(&k.as_str()))
+        .collect();
+
+    // Add metadata so future versions can detect the format
+    export.insert(
+        "_hermes_export_version".to_string(),
+        "1".to_string(),
+    );
+    export.insert(
+        "_hermes_app_version".to_string(),
+        env!("CARGO_PKG_VERSION").to_string(),
+    );
+    export.insert(
+        "_hermes_exported_at".to_string(),
+        chrono::Utc::now().to_rfc3339(),
+    );
+
+    let json = serde_json::to_string_pretty(&export)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
     std::fs::write(&validated, json).map_err(|e| format!("Failed to write file: {}", e))?;
     Ok(())
@@ -2981,6 +3086,10 @@ pub fn import_settings(
         serde_json::from_str(&content).map_err(|e| format!("Invalid settings JSON: {}", e))?;
     let db = state.db.lock().map_err(|e| e.to_string())?;
     for (key, value) in &imported {
+        // Skip metadata keys (prefixed with _hermes_)
+        if key.starts_with("_hermes_") {
+            continue;
+        }
         if !VALID_SETTING_KEYS.contains(&key.as_str()) {
             continue; // Skip unknown keys silently during import
         }

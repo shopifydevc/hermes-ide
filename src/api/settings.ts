@@ -1,3 +1,21 @@
+// ─── Settings API ─────────────────────────────────────────────────────
+//
+// All app settings are stored as key-value pairs in the settings table.
+// Valid keys are defined in VALID_SETTING_KEYS (src-tauri/src/db/mod.rs).
+//
+// Export/Import:
+//   - exportSettings() writes a JSON file with all non-machine-specific
+//     settings plus metadata (_hermes_export_version, _hermes_app_version).
+//   - importSettings() reads the file, skips unknown/metadata keys, and
+//     returns the merged settings map.
+//   - Machine-specific keys (window geometry, workspace layout, etc.) are
+//     excluded from export via EXPORT_EXCLUDED_KEYS in the Rust backend.
+//
+// Plugin settings are stored in a separate table (plugin_storage) and
+// are NOT included in app settings export/import.
+//
+// When adding new settings: update VALID_SETTING_KEYS in db/mod.rs.
+
 import { invoke } from "@tauri-apps/api/core";
 
 export type SettingsMap = Record<string, string>;
