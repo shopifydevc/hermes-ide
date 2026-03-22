@@ -137,6 +137,10 @@
 .ctx-tool-name {
   color: var(--text-2);
   min-width: 45px;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ctx-tool-bar-track {
   flex: 1;
