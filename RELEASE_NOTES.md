@@ -1,27 +1,17 @@
-# v0.6.0
+# v0.6.2
 
 ## New
 
-- **Built-in code editor with syntax highlighting** — Open any file and edit it directly with proper syntax highlighting for 13 languages including TypeScript, Rust, Python, Go, Java, C/C++, PHP, SQL, and more
-- **Bracket matching, code folding, and auto-indent** — The editor now behaves like a real code editor with smart editing features powered by CodeMirror 6
-- **Native find and replace** — Press Cmd+F to search and Cmd+H to replace, with match highlighting and navigation built into the editor
-- **Auto-save** — Files save automatically after 2 seconds of inactivity, with a manual Cmd+S option and a dirty indicator in the header
-- **AI provider detection during setup** — The onboarding wizard now detects which AI tools you have installed and shows install commands for missing ones
+- **Jump to line number** — Press Cmd+G to quickly navigate to any line in the editor
+- **Word wrap toggle** — Toggle soft word wrap on and off from the editor status bar
+- **Indentation settings** — Switch between tabs and spaces and choose tab size (2, 4, or 8) from the editor status bar
+- **Cursor position indicator** — The editor now shows your current line, column, line character count, selection length, and total lines in a status bar at the bottom
 
 ## Improved
 
-- **Redesigned theme picker in onboarding** — Themes are now grouped into Dark and Light sections in a compact grid, making it easier to browse all 29 themes at a glance
-- **All theme previews now display correctly** — 14 themes that previously showed empty squares in the onboarding picker now show proper color previews
-- **Settings export is smarter** — Exported files now include version metadata, and machine-specific settings like window size and workspace layout are excluded so imports work across different machines
-- **Settings import applies changes immediately** — Importing settings now instantly updates the theme, analytics preferences, and autonomous mode without requiring a restart
-- **Plugin text and button sizes scale consistently** — All plugin panels now follow the global UI scale setting
-
-## Fixed
-
-- **Save & Close no longer loses data on failure** — Previously, if a file save failed, the editor would close anyway and discard unsaved changes
-- **External file changes no longer overwrite your edits** — If a file is changed on disk while you have unsaved edits, the editor now keeps your work instead of silently replacing it
-- **Editor keyboard shortcuts no longer re-register on every keystroke** — Fixed a performance issue where global key listeners were torn down and recreated on each character typed
-- **Find matches no longer recalculate on every render** — Improved performance when using find/replace on large files
-- **Hash comments no longer highlight incorrectly in JavaScript and Rust** — The `#` character was incorrectly styled as a comment in languages that don't use hash comments
-- **Importing a non-settings JSON file now shows an error** — Previously, importing an unrelated JSON file would silently do nothing
-- **Two settings were silently failing to save** — Activity bar order and plugin uninstall tracking now persist correctly
+- **Standard keyboard shortcuts** — The editor now supports toggle comment (Cmd+/), block comment (Cmd+Shift+/), move line up/down (Alt+Up/Down), duplicate line (Shift+Alt+Up/Down), delete line (Cmd+Shift+K), select next occurrence (Cmd+D), insert line above/below (Cmd+Enter / Cmd+Shift+Enter), and jump to matching bracket (Cmd+Shift+\)
+- **Search and replace panel now matches your theme** — The find/replace bar previously appeared with default unstyled colors; it now respects all 29 themes
+- **Text selection is now clearly visible** — Selection highlighting was previously too faint to see on most themes
+- **Tab key works correctly** — Pressing Tab now inserts indentation at the cursor instead of re-indenting the entire line
+- **Editor scrollbars are thinner and less intrusive** — Scrollbars in the code editor are now slim and blend with the theme
+- **Editor auto-focuses when opened** — Keyboard shortcuts now work immediately without needing to click into the editor first
