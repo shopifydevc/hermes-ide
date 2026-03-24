@@ -1283,41 +1283,6 @@ pub fn git_list_branches(
         });
     }
 
-    // Remote branches
-    let remote_branches = repo
-        .branches(Some(BranchType::Remote))
-        .map_err(|e| e.to_string())?;
-
-    for branch_result in remote_branches {
-        let (branch, _) = branch_result.map_err(|e| e.to_string())?;
-        let name = branch
-            .name()
-            .map_err(|e| e.to_string())?
-            .unwrap_or("")
-            .to_string();
-
-        // Skip HEAD pointer references like origin/HEAD
-        if name.ends_with("/HEAD") {
-            continue;
-        }
-
-        let last_commit_summary = branch
-            .get()
-            .peel_to_commit()
-            .ok()
-            .map(|c| c.summary().unwrap_or("").to_string());
-
-        branches.push(GitBranch {
-            name,
-            is_current: false,
-            is_remote: true,
-            upstream: None,
-            ahead: 0,
-            behind: 0,
-            last_commit_summary,
-        });
-    }
-
     Ok(branches)
 }
 
@@ -1347,7 +1312,6 @@ pub fn git_list_branches_for_project(
         .ok()
         .and_then(|h| h.shorthand().map(|s| s.to_string()));
 
-    // Local branches
     let local_branches = repo
         .branches(Some(BranchType::Local))
         .map_err(|e| e.to_string())?;
@@ -1399,40 +1363,6 @@ pub fn git_list_branches_for_project(
             upstream: upstream_name,
             ahead,
             behind,
-            last_commit_summary,
-        });
-    }
-
-    // Remote branches
-    let remote_branches = repo
-        .branches(Some(BranchType::Remote))
-        .map_err(|e| e.to_string())?;
-
-    for branch_result in remote_branches {
-        let (branch, _) = branch_result.map_err(|e| e.to_string())?;
-        let name = branch
-            .name()
-            .map_err(|e| e.to_string())?
-            .unwrap_or("")
-            .to_string();
-
-        if name.ends_with("/HEAD") {
-            continue;
-        }
-
-        let last_commit_summary = branch
-            .get()
-            .peel_to_commit()
-            .ok()
-            .map(|c| c.summary().unwrap_or("").to_string());
-
-        branches.push(GitBranch {
-            name,
-            is_current: false,
-            is_remote: true,
-            upstream: None,
-            ahead: 0,
-            behind: 0,
             last_commit_summary,
         });
     }
@@ -3173,38 +3103,6 @@ pub fn git_list_branches_for_projects(
                     upstream: upstream_name,
                     ahead,
                     behind,
-                    last_commit_summary,
-                });
-            }
-        }
-
-        // Remote branches
-        if let Ok(remote_branches) = repo.branches(Some(BranchType::Remote)) {
-            for branch_result in remote_branches {
-                let (branch, _) = match branch_result {
-                    Ok(b) => b,
-                    Err(_) => continue,
-                };
-                let name = branch.name().ok().flatten().unwrap_or("").to_string();
-
-                // Skip HEAD pointer references like origin/HEAD
-                if name.ends_with("/HEAD") {
-                    continue;
-                }
-
-                let last_commit_summary = branch
-                    .get()
-                    .peel_to_commit()
-                    .ok()
-                    .map(|c| c.summary().unwrap_or("").to_string());
-
-                branches.push(GitBranch {
-                    name,
-                    is_current: false,
-                    is_remote: true,
-                    upstream: None,
-                    ahead: 0,
-                    behind: 0,
                     last_commit_summary,
                 });
             }
