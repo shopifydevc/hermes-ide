@@ -331,6 +331,7 @@ export function PromptComposer({ sessionId, onClose, addToast }: PromptComposerP
       }
       const { templates: newTemplates, roles: newRoles, styles: newStyles, result } = importBundle(
         validation.bundle, userTemplates, customRoles, customStyles, builtInRoleIds, builtInStyleIds,
+        BUILT_IN_TEMPLATES,
       );
 
       // Persist

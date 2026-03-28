@@ -168,6 +168,7 @@ export function importBundle(
 	existingStyles: StyleDefinition[],
 	builtInRoleIds: Set<string>,
 	builtInStyleIds: Set<string>,
+	builtInTemplates: PromptTemplate[] = [],
 ): {
 	templates: PromptTemplate[];
 	roles: RoleDefinition[];
@@ -224,7 +225,7 @@ export function importBundle(
 
 	// ── Step 3: Import templates ──────────────────────────────────────
 	const existingNameSet = new Set(
-		existingTemplates.map((t) => t.name.toLowerCase()),
+		[...existingTemplates, ...builtInTemplates].map((t) => t.name.toLowerCase()),
 	);
 	const newTemplates = [...existingTemplates];
 
