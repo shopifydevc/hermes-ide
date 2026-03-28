@@ -198,7 +198,11 @@ impl PtyManager {
 
 // ─── Helper Functions ───────────────────────────────────────────────
 
-pub(crate) fn ai_launch_command(provider: &str, permission_mode: &str, custom_suffix: &str) -> Option<String> {
+pub(crate) fn ai_launch_command(
+    provider: &str,
+    permission_mode: &str,
+    custom_suffix: &str,
+) -> Option<String> {
     let base = match provider {
         "claude" => "claude",
         "aider" => "aider",
@@ -636,11 +640,26 @@ mod tests {
     fn ai_launch_command_default_mode() {
         use super::ai_launch_command;
 
-        assert_eq!(ai_launch_command("claude", "default", ""), Some("claude".into()));
-        assert_eq!(ai_launch_command("aider", "default", ""), Some("aider".into()));
-        assert_eq!(ai_launch_command("codex", "default", ""), Some("codex".into()));
-        assert_eq!(ai_launch_command("gemini", "default", ""), Some("gemini".into()));
-        assert_eq!(ai_launch_command("copilot", "default", ""), Some("gh copilot".into()));
+        assert_eq!(
+            ai_launch_command("claude", "default", ""),
+            Some("claude".into())
+        );
+        assert_eq!(
+            ai_launch_command("aider", "default", ""),
+            Some("aider".into())
+        );
+        assert_eq!(
+            ai_launch_command("codex", "default", ""),
+            Some("codex".into())
+        );
+        assert_eq!(
+            ai_launch_command("gemini", "default", ""),
+            Some("gemini".into())
+        );
+        assert_eq!(
+            ai_launch_command("copilot", "default", ""),
+            Some("gh copilot".into())
+        );
         assert_eq!(ai_launch_command("unknown", "default", ""), None);
     }
 
@@ -667,13 +686,25 @@ mod tests {
         );
 
         // Other providers only support bypassPermissions
-        assert_eq!(ai_launch_command("aider", "bypassPermissions", ""), Some("aider --yes".into()));
-        assert_eq!(ai_launch_command("codex", "bypassPermissions", ""), Some("codex --full-auto".into()));
-        assert_eq!(ai_launch_command("gemini", "bypassPermissions", ""), Some("gemini --yolo".into()));
+        assert_eq!(
+            ai_launch_command("aider", "bypassPermissions", ""),
+            Some("aider --yes".into())
+        );
+        assert_eq!(
+            ai_launch_command("codex", "bypassPermissions", ""),
+            Some("codex --full-auto".into())
+        );
+        assert_eq!(
+            ai_launch_command("gemini", "bypassPermissions", ""),
+            Some("gemini --yolo".into())
+        );
 
         // Unsupported modes fall back to no flag
         assert_eq!(ai_launch_command("aider", "plan", ""), Some("aider".into()));
-        assert_eq!(ai_launch_command("copilot", "bypassPermissions", ""), Some("gh copilot".into()));
+        assert_eq!(
+            ai_launch_command("copilot", "bypassPermissions", ""),
+            Some("gh copilot".into())
+        );
     }
 
     #[test]

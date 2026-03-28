@@ -687,7 +687,11 @@ pub fn create_session(
         ai_provider: ai_provider.clone(),
         auto_approve: auto_approve.unwrap_or(false),
         permission_mode: permission_mode.unwrap_or_else(|| {
-            if auto_approve.unwrap_or(false) { "bypassPermissions".to_string() } else { "default".to_string() }
+            if auto_approve.unwrap_or(false) {
+                "bypassPermissions".to_string()
+            } else {
+                "default".to_string()
+            }
         }),
         custom_suffix: custom_suffix.unwrap_or_default(),
         channels: channels.unwrap_or_default(),
@@ -1462,10 +1466,17 @@ pub fn create_session(
                                 s.channels.clone(),
                             )
                         });
-                        if let Some((Some(ref provider), has_context, ref perm_mode, ref custom_suffix, ref channels)) =
-                            launch_data
+                        if let Some((
+                            Some(ref provider),
+                            has_context,
+                            ref perm_mode,
+                            ref custom_suffix,
+                            ref channels,
+                        )) = launch_data
                         {
-                            if let Some(launch_cmd) = ai_launch_command(provider, perm_mode, custom_suffix) {
+                            if let Some(launch_cmd) =
+                                ai_launch_command(provider, perm_mode, custom_suffix)
+                            {
                                 let supports_cli_prompt =
                                     provider == "claude" || provider == "gemini";
                                 let mut cmd = if has_context && supports_cli_prompt {
