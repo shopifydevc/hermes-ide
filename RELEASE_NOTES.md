@@ -1,11 +1,11 @@
-# v0.6.6
+# v0.6.7
+
+## New
+
+- **Permission modes for AI sessions** — Choose how much autonomy your AI agent gets when creating a session: Ask Permissions, Accept Edits, Plan Mode, Auto Mode, or Bypass Permissions. Each mode maps to the right CLI flag for your agent (Claude, Aider, Codex, Gemini).
+- **Custom command flags** — Add your own flags (e.g. `--model opus`) that get appended to the AI agent launch command. Set a global default in Settings or override per session.
+- **AI Agent settings tab** — New settings page to configure default permission mode and custom flags for all new sessions.
 
 ## Fixes
 
-- **Template browser no longer blocks last items** — The description preview at the bottom of the template picker no longer pushes items out of view when scrolling down.
-- **Plugin panels now open correctly when only one plugin is installed** — Clicking a plugin's sidebar button had no effect if it was the only plugin; this is now fixed.
-- **Removed automatic session color lines** — Sessions no longer show an auto-assigned colored border based on the git branch name. Only user-chosen colors are displayed.
-
-## Improved
-
-- **Importing duplicate templates is now silently skipped** — Re-importing a template bundle that contains templates matching existing or built-in names will skip them without creating duplicates.
+- **Template browser no longer hides last items behind the description preview** — Long descriptions could cover the bottom entries; the list now scrolls past the preview area.
