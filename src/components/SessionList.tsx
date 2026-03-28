@@ -66,16 +66,6 @@ function sessionCost(session: SessionData): number {
 }
 
 /** Deterministic color accent based on branch name (R1.3). */
-function branchColor(branchName: string): string {
-  let hash = 0;
-  for (let i = 0; i < branchName.length; i++) {
-    hash = ((hash << 5) - hash) + branchName.charCodeAt(i);
-    hash |= 0;
-  }
-  const hue = ((hash % 360) + 360) % 360;
-  // Use 45% saturation (less vivid) and 55% lightness for better contrast
-  return `hsl(${hue}, 45%, 55%)`;
-}
 
 // Sort: active sessions first (idle/busy/etc.), destroyed at bottom
 function sortSessions(sessions: SessionData[]): SessionData[] {
@@ -168,20 +158,8 @@ function SessionItemGitInfo({ sessionId, isDestroyed, workingDirectory, isSsh }:
  * deterministic color accent as a CSS custom property on the closest
  * `.session-item-wrapper` ancestor element.
  */
-function SessionItemBranchAccent({ sessionId, isDestroyed, workingDirectory }: { sessionId: string; isDestroyed: boolean; workingDirectory: string }) {
-  const { branch } = useSessionGitSummary(sessionId, !isDestroyed, workingDirectory);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const wrapper = ref.current?.closest('.session-item-wrapper') as HTMLElement | null;
-    if (wrapper && branch) {
-      wrapper.style.borderLeft = `3px solid ${branchColor(branch)}`;
-    } else if (wrapper) {
-      wrapper.style.borderLeft = '';
-    }
-  }, [branch]);
-
-  return <span ref={ref} style={{ display: 'none' }} />;
+function SessionItemBranchAccent({ }: { sessionId: string; isDestroyed: boolean; workingDirectory: string }) {
+  return null;
 }
 
 /** Sub-component: tmux window tabs for SSH sessions with tmux attached. */
