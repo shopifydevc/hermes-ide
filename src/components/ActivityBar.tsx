@@ -54,7 +54,6 @@ export function ActivityBar({ side, tabs, activeTabId, onTabClick, onReorder, to
 
   const handleMouseDown = (e: React.MouseEvent, tabId: string) => {
     if (!onReorder || tabs.length < 2) {
-      onTabClick(tabId);
       return;
     }
     e.preventDefault();
