@@ -281,6 +281,19 @@ jobs:
 
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
+      - name: Pre-sign PTY helper for macOS bundle
+        if: steps.check.outputs.enabled == 'true' && runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: "${{ matrix.sign && secrets.APPLE_SIGNING_IDENTITY || '' }}"
+        run: |
+          cargo build --release --target ${{ matrix.target }} --bin hermes-pty-setup
+          HELPER="src-tauri/target/${{ matrix.target }}/release/hermes-pty-setup"
+          if [ -n "$APPLE_SIGNING_IDENTITY" ] && [ -f "$HELPER" ]; then
+            codesign --force -s "$APPLE_SIGNING_IDENTITY" "$HELPER"
+            echo "Pre-signed hermes-pty-setup"
+          fi
+
       - name: Build and sign
         if: steps.check.outputs.enabled == 'true'
         shell: bash
@@ -290,17 +303,6 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_SIGNING_IDENTITY: "${{ matrix.sign && secrets.APPLE_SIGNING_IDENTITY || '' }}"
         run: npx tauri build --target ${{ matrix.target }}
-
-      - name: Bundle PTY helper into macOS app
-        if: steps.check.outputs.enabled == 'true' && runner.os == 'macOS'
-        shell: bash
-        run: |
-          HELPER="src-tauri/target/${{ matrix.target }}/release/hermes-pty-setup"
-          APP_DIR=$(find src-tauri/target/${{ matrix.target }}/release/bundle/macos -path "*/Contents/MacOS" -type d | head -1)
-          if [ -f "$HELPER" ] && [ -n "$APP_DIR" ]; then
-            cp "$HELPER" "$APP_DIR/hermes-pty-setup"
-            echo "Bundled hermes-pty-setup into $APP_DIR/"
-          fi
 
       - name: Notarize DMG
         if: steps.check.outputs.enabled == 'true' && matrix.notarize
