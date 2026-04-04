@@ -2463,7 +2463,6 @@ pub fn get_context_snapshot(
     db.get_context_snapshot(&session_id, version)
 }
 
-
 // ─── Cost by Project Command ─────────────────────────────────────────
 
 #[tauri::command]
