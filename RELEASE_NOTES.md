@@ -1,7 +1,15 @@
-# v0.6.9
+# v0.6.10
 
-## Fixes
+## New
 
-- **sudo and password prompts now work in terminals** — Commands like `sudo`, `ssh` (password auth), and `gpg` that need to read passwords securely were failing silently. They now prompt for input as expected.
+- **Template Picker tabs** — Built-in and user templates are now separated into their own tabs for easier browsing.
 
-- **Sidebar panels no longer flicker when toggling** — Clicking a panel button (like Context) would close and immediately reopen it. Panels now toggle reliably with a single click.
+- **Custom template groups** — Organize your saved and imported templates into named groups. Create, rename, and delete groups directly from the picker.
+
+- **Auto-grouping on import** — Importing a template bundle automatically creates a group named after the file, keeping imported sets organized.
+
+- **Updated AI permission modes** — New options for Claude (Don't Ask mode), Codex (Auto and full bypass), and Aider (Auto and stronger bypass) to match the latest CLI versions.
+
+## Removed
+
+- **Execution Timeline panel** — The panel below the terminal showing execution nodes has been removed to reduce clutter.
