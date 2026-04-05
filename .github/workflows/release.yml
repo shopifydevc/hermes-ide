@@ -110,6 +110,8 @@ jobs:
             enabled: ${{ needs.config.outputs.build_macos }}
           - os: ubuntu-22.04
             enabled: ${{ needs.config.outputs.build_linux }}
+          - os: windows-2022
+            enabled: ${{ needs.config.outputs.build_windows }}
     runs-on: ${{ matrix.os }}
     if: always()
     steps:
@@ -139,6 +141,10 @@ jobs:
           packages: libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
           version: 1.0
 
+      - name: Install zlib via vcpkg (Windows)
+        if: matrix.enabled == 'true' && runner.os == 'Windows'
+        run: vcpkg install zlib:x64-windows
+
       - name: Build PTY helper (needed by tests on macOS)
         if: matrix.enabled == 'true' && runner.os == 'macOS'
         working-directory: src-tauri/pty-setup
@@ -147,6 +153,8 @@ jobs:
       - name: Run Rust tests
         if: matrix.enabled == 'true'
         working-directory: src-tauri
+        env:
+          VCPKG_ROOT: C:\vcpkg
         run: cargo test
 
   # ── Build (selected platforms) ─────────────────────────────────────
